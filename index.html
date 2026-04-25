@@ -51,17 +51,19 @@
 
     <a-entity
       id="player-rig"
-      position="0 -1.15 4"
+      position="0 0 4"
       gorilla-locomotion="leftHand: #left-hand; rightHand: #right-hand; head: #player-camera; debugText: #debug-text"
     >
       <a-camera id="player-camera" position="0 0 0" wasd-controls-enabled="false">
-        <a-entity id="debug-panel" position="0 -0.28 -1.1">
-          <a-plane width="1.3" height="0.5" color="#111111" opacity="0.8"></a-plane>
+        <a-entity id="debug-panel" position="0 -0.12 -1.2">
+          <a-plane width="2.25" height="1.45" color="#111111" opacity="0.82"></a-plane>
           <a-text
             id="debug-text"
-            position="0 0 0.01"
-            align="center"
-            width="1.95"
+            position="-1.02 0.58 0.01"
+            align="left"
+            anchor="left"
+            baseline="top"
+            width="2.1"
             color="#FFFFFF"
             value="Waiting for hand tracking..."
           ></a-text>
