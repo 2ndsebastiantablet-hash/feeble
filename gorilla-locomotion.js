@@ -5,8 +5,10 @@
     boxMin: new THREE.Vector3(),
     boxMax: new THREE.Vector3(),
     closestPoint: new THREE.Vector3(),
+    launchAverage: new THREE.Vector3(),
     handPush: new THREE.Vector3(),
     handResolved: new THREE.Vector3(),
+    pushVelocity: new THREE.Vector3(),
     visualLocal: new THREE.Vector3()
   };
 
@@ -25,10 +27,17 @@
       debugText: { type: "selector" },
       handRadius: { default: 0.12 },
       floorHeight: { default: 0 },
+      playerHeightOffset: { default: 0.62 },
       gravity: { default: -14.7 },
       linearDrag: { default: 3.5 },
       maxMovePerFrame: { default: 0.3 },
       maxVelocity: { default: 6.5 },
+      launchMultiplier: { default: 1.15 },
+      floorLaunchUpwardFactor: { default: 0.42 },
+      downwardLaunchBoost: { default: 1.35 },
+      maxLaunchSpeed: { default: 8.5 },
+      launchThreshold: { default: 1.4 },
+      pushHistoryFrames: { default: 6 },
       bodyRadius: { default: 0.32 },
       bodyHeight: { default: 1.0 }
     },
@@ -48,14 +57,19 @@
       this.rightDelta = new THREE.Vector3();
       this.frameMovement = new THREE.Vector3();
       this.velocity = new THREE.Vector3();
+      this.launchVelocity = new THREE.Vector3();
       this.leftResolved = new THREE.Vector3();
       this.rightResolved = new THREE.Vector3();
+      this.pushHistory = [];
 
       this.leftTouchingFloor = false;
       this.rightTouchingFloor = false;
       this.leftTouchingSurface = false;
       this.rightTouchingSurface = false;
       this.hasPreviousHands = false;
+      this.grounded = true;
+      this.wasTouchingSurface = false;
+      this.wasTouchingFloor = false;
 
       this.setup = this.setup.bind(this);
       this.resetTracking = this.resetTracking.bind(this);
@@ -84,13 +98,15 @@
     },
 
     resetTracking: function () {
-      // Start the locomotion rig at floor level. In Quest, the XR headset pose
-      // already supplies the user's real standing eye height.
-      this.rig.position.y = this.data.floorHeight;
+      // Lower the XR reference space slightly so standing players can reach the
+      // in-game floor comfortably without crouching to their real floor.
+      this.rig.position.y = this.getGroundedRigY();
       this.velocity.set(0, 0, 0);
+      this.launchVelocity.set(0, 0, 0);
       this.leftDelta.set(0, 0, 0);
       this.rightDelta.set(0, 0, 0);
       this.frameMovement.set(0, 0, 0);
+      this.pushHistory = [];
 
       this.readHandWorldPositions();
       this.previousLeftWorld.copy(this.currentLeftWorld);
@@ -101,6 +117,9 @@
       this.rightTouchingFloor = false;
       this.leftTouchingSurface = false;
       this.rightTouchingSurface = false;
+      this.wasTouchingSurface = false;
+      this.wasTouchingFloor = false;
+      this.grounded = true;
 
       this.updateHandVisual(this.data.leftHand, this.leftVisual, this.currentLeftWorld);
       this.updateHandVisual(this.data.rightHand, this.rightVisual, this.currentRightWorld);
@@ -137,6 +156,9 @@
       this.leftTouchingSurface = this.resolveHandCollision(this.currentLeftWorld, this.leftResolved);
       this.rightTouchingSurface = this.resolveHandCollision(this.currentRightWorld, this.rightResolved);
 
+      const touchingSurface = this.leftTouchingSurface || this.rightTouchingSurface;
+      const touchingFloor = this.leftTouchingFloor || this.rightTouchingFloor;
+
       this.frameMovement.set(0, 0, 0);
 
       if (this.leftTouchingSurface) {
@@ -158,13 +180,22 @@
       if (this.frameMovement.lengthSq() > 0) {
         this.rig.position.add(this.frameMovement);
         this.velocity.copy(this.frameMovement).divideScalar(deltaTime);
+        this.recordPushVelocity(deltaTime);
       } else {
+        if (this.wasTouchingSurface && !touchingSurface) {
+          this.applyLaunchVelocity();
+        } else if (!touchingSurface) {
+          this.pushHistory = [];
+          this.launchVelocity.set(0, 0, 0);
+        }
+
         this.velocity.y += this.data.gravity * deltaTime;
         this.rig.position.addScaledVector(this.velocity, deltaTime);
       }
 
       this.applyRigFloorClamp();
       this.resolveBodyCollision();
+      this.grounded = this.rig.position.y <= this.getGroundedRigY() + 0.01 && this.velocity.y <= 0.05;
 
       const dragFactor = Math.max(0, 1 - this.data.linearDrag * deltaTime);
       this.velocity.multiplyScalar(dragFactor);
@@ -178,6 +209,8 @@
       this.readHandWorldPositions();
       this.previousLeftWorld.copy(this.currentLeftWorld);
       this.previousRightWorld.copy(this.currentRightWorld);
+      this.wasTouchingSurface = touchingSurface;
+      this.wasTouchingFloor = touchingFloor;
 
       this.updateHandVisual(
         this.data.leftHand,
@@ -328,8 +361,10 @@
     },
 
     applyRigFloorClamp: function () {
-      if (this.rig.position.y < this.data.floorHeight) {
-        this.rig.position.y = this.data.floorHeight;
+      const groundedRigY = this.getGroundedRigY();
+
+      if (this.rig.position.y < groundedRigY) {
+        this.rig.position.y = groundedRigY;
 
         if (this.velocity.y < 0) {
           this.velocity.y = 0;
@@ -347,20 +382,83 @@
       handVisual.object3D.position.copy(TEMP.visualLocal);
     },
 
+    getGroundedRigY: function () {
+      return this.data.floorHeight - this.data.playerHeightOffset;
+    },
+
+    recordPushVelocity: function (deltaTime) {
+      TEMP.pushVelocity.copy(this.frameMovement).divideScalar(deltaTime);
+      this.pushHistory.push(TEMP.pushVelocity.clone());
+
+      if (this.pushHistory.length > this.data.pushHistoryFrames) {
+        this.pushHistory.shift();
+      }
+    },
+
+    getAveragePushVelocity: function () {
+      TEMP.launchAverage.set(0, 0, 0);
+
+      if (!this.pushHistory.length) {
+        return TEMP.launchAverage;
+      }
+
+      for (const sample of this.pushHistory) {
+        TEMP.launchAverage.add(sample);
+      }
+
+      TEMP.launchAverage.divideScalar(this.pushHistory.length);
+      return TEMP.launchAverage;
+    },
+
+    applyLaunchVelocity: function () {
+      const averagePush = this.getAveragePushVelocity();
+      const averageSpeed = averagePush.length();
+
+      this.launchVelocity.set(0, 0, 0);
+
+      if (averageSpeed < this.data.launchThreshold) {
+        this.pushHistory = [];
+        return;
+      }
+
+      this.launchVelocity.copy(averagePush).multiplyScalar(this.data.launchMultiplier);
+
+      if (this.wasTouchingFloor) {
+        const planarSpeed = Math.hypot(averagePush.x, averagePush.z);
+        const upwardFromPlanar = planarSpeed * this.data.floorLaunchUpwardFactor;
+        const upwardFromDownPush = Math.max(0, averagePush.y) * this.data.downwardLaunchBoost;
+        this.launchVelocity.y = Math.max(
+          this.launchVelocity.y,
+          upwardFromPlanar,
+          upwardFromDownPush
+        );
+      }
+
+      if (this.launchVelocity.lengthSq() > this.data.maxLaunchSpeed * this.data.maxLaunchSpeed) {
+        this.launchVelocity.setLength(this.data.maxLaunchSpeed);
+      }
+
+      this.velocity.copy(this.launchVelocity);
+      this.pushHistory = [];
+    },
+
     updateDebugText: function () {
       if (!this.data.debugText) {
         return;
       }
 
       this.data.debugText.setAttribute("value", [
-        "L world: " + this.formatVector(this.currentLeftWorld),
-        "R world: " + this.formatVector(this.currentRightWorld),
+        "Head y: " + this.currentHeadWorld.y.toFixed(2),
+        "L hand y: " + this.currentLeftWorld.y.toFixed(2),
+        "R hand y: " + this.currentRightWorld.y.toFixed(2),
         "L delta: " + this.formatVector(this.leftDelta),
         "R delta: " + this.formatVector(this.rightDelta),
         "L touching floor: " + this.leftTouchingFloor,
         "R touching floor: " + this.rightTouchingFloor,
         "Move applied: " + this.formatVector(this.frameMovement),
-        "Rig pos: " + this.formatVector(this.rig.position),
+        "Launch velocity: " + this.formatVector(this.launchVelocity),
+        "Grounded: " + this.grounded,
+        "Rig y: " + this.rig.position.y.toFixed(2),
         "Velocity: " + this.formatVector(this.velocity)
       ].join("\n"));
     },
