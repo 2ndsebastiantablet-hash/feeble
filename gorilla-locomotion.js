@@ -1,4 +1,15 @@
 (function () {
+  const HAND_PUSH_MULTIPLIER = 1.55; // Increase for faster movement, decrease for more control.
+  const ONE_HAND_LAUNCH_MULTIPLIER = 1.4; // Increase for stronger one-hand hops and higher jumps, decrease for less flying.
+  const TWO_HAND_LAUNCH_MULTIPLIER = 1.8; // Increase for stronger two-hand launches, decrease for more control.
+  const UPWARD_BOUNCE_BOOST = 2.2; // Increase for higher jumps and more bounce, decrease for less flying.
+  const MAX_LAUNCH_SPEED = 10.2; // Increase for faster/higher launches, decrease for less flying and more control.
+  const VELOCITY_LIMIT = 1.15; // Lower for easier launches and less stiffness, raise for more control.
+  const AIR_DRAG = 1.1; // Lower for longer air momentum and less stiffness, raise for more control.
+  const GROUND_DRAG = 2.35; // Lower for slipperier movement and less stiffness, raise for more control.
+  const GRAVITY = -13.2; // Lower magnitude for floatier higher jumps, raise magnitude for less flying.
+  const MAX_FRAME_MOVE = 0.38; // Increase for faster hand pushes, decrease for more control and safety.
+
   const TEMP = {
     bodyCenter: new THREE.Vector3(),
     boxCenter: new THREE.Vector3(),
@@ -28,15 +39,18 @@
       handRadius: { default: 0.12 },
       floorHeight: { default: 0 },
       playerHeightOffset: { default: 0.62 },
-      gravity: { default: -14.7 },
-      linearDrag: { default: 3.5 },
-      maxMovePerFrame: { default: 0.3 },
-      maxVelocity: { default: 6.5 },
-      launchMultiplier: { default: 1.15 },
+      gravity: { default: GRAVITY },
+      airDrag: { default: AIR_DRAG },
+      groundDrag: { default: GROUND_DRAG },
+      maxMovePerFrame: { default: MAX_FRAME_MOVE },
+      handPushMultiplier: { default: HAND_PUSH_MULTIPLIER },
+      maxVelocity: { default: MAX_LAUNCH_SPEED },
+      oneHandLaunchMultiplier: { default: ONE_HAND_LAUNCH_MULTIPLIER },
+      twoHandLaunchMultiplier: { default: TWO_HAND_LAUNCH_MULTIPLIER },
       floorLaunchUpwardFactor: { default: 0.42 },
-      downwardLaunchBoost: { default: 1.35 },
-      maxLaunchSpeed: { default: 8.5 },
-      launchThreshold: { default: 1.4 },
+      upwardBounceBoost: { default: UPWARD_BOUNCE_BOOST },
+      maxLaunchSpeed: { default: MAX_LAUNCH_SPEED },
+      velocityLimit: { default: VELOCITY_LIMIT },
       pushHistoryFrames: { default: 6 },
       bodyRadius: { default: 0.32 },
       bodyHeight: { default: 1.0 }
@@ -70,6 +84,7 @@
       this.grounded = true;
       this.wasTouchingSurface = false;
       this.wasTouchingFloor = false;
+      this.wasTwoHandTouchingFloor = false;
 
       this.setup = this.setup.bind(this);
       this.resetTracking = this.resetTracking.bind(this);
@@ -119,6 +134,7 @@
       this.rightTouchingSurface = false;
       this.wasTouchingSurface = false;
       this.wasTouchingFloor = false;
+      this.wasTwoHandTouchingFloor = false;
       this.grounded = true;
 
       this.updateHandVisual(this.data.leftHand, this.leftVisual, this.currentLeftWorld);
@@ -158,6 +174,7 @@
 
       const touchingSurface = this.leftTouchingSurface || this.rightTouchingSurface;
       const touchingFloor = this.leftTouchingFloor || this.rightTouchingFloor;
+      const twoHandsTouchingFloor = this.leftTouchingFloor && this.rightTouchingFloor;
 
       this.frameMovement.set(0, 0, 0);
 
@@ -172,6 +189,8 @@
       if (this.leftTouchingSurface && this.rightTouchingSurface) {
         this.frameMovement.multiplyScalar(0.5);
       }
+
+      this.frameMovement.multiplyScalar(this.data.handPushMultiplier);
 
       if (this.frameMovement.lengthSq() > this.data.maxMovePerFrame * this.data.maxMovePerFrame) {
         this.frameMovement.setLength(this.data.maxMovePerFrame);
@@ -197,7 +216,8 @@
       this.resolveBodyCollision();
       this.grounded = this.rig.position.y <= this.getGroundedRigY() + 0.01 && this.velocity.y <= 0.05;
 
-      const dragFactor = Math.max(0, 1 - this.data.linearDrag * deltaTime);
+      const activeDrag = this.grounded ? this.data.groundDrag : this.data.airDrag;
+      const dragFactor = Math.max(0, 1 - activeDrag * deltaTime);
       this.velocity.multiplyScalar(dragFactor);
 
       if (this.velocity.lengthSq() > this.data.maxVelocity * this.data.maxVelocity) {
@@ -211,6 +231,7 @@
       this.previousRightWorld.copy(this.currentRightWorld);
       this.wasTouchingSurface = touchingSurface;
       this.wasTouchingFloor = touchingFloor;
+      this.wasTwoHandTouchingFloor = twoHandsTouchingFloor;
 
       this.updateHandVisual(
         this.data.leftHand,
@@ -413,20 +434,24 @@
     applyLaunchVelocity: function () {
       const averagePush = this.getAveragePushVelocity();
       const averageSpeed = averagePush.length();
+      const bothHandsWerePushing = this.wasTouchingFloor && this.wasTwoHandTouchingFloor;
+      const launchMultiplier = bothHandsWerePushing
+        ? this.data.twoHandLaunchMultiplier
+        : this.data.oneHandLaunchMultiplier;
 
       this.launchVelocity.set(0, 0, 0);
 
-      if (averageSpeed < this.data.launchThreshold) {
+      if (averageSpeed < this.data.velocityLimit) {
         this.pushHistory = [];
         return;
       }
 
-      this.launchVelocity.copy(averagePush).multiplyScalar(this.data.launchMultiplier);
+      this.launchVelocity.copy(averagePush).multiplyScalar(launchMultiplier);
 
       if (this.wasTouchingFloor) {
         const planarSpeed = Math.hypot(averagePush.x, averagePush.z);
         const upwardFromPlanar = planarSpeed * this.data.floorLaunchUpwardFactor;
-        const upwardFromDownPush = Math.max(0, averagePush.y) * this.data.downwardLaunchBoost;
+        const upwardFromDownPush = Math.max(0, averagePush.y) * this.data.upwardBounceBoost;
         this.launchVelocity.y = Math.max(
           this.launchVelocity.y,
           upwardFromPlanar,
