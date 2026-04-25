@@ -1,4 +1,4 @@
-name = "feeble-multiplayer"
+name = "feeble"
 main = "backend/server.js"
 compatibility_date = "2026-04-25"
 
