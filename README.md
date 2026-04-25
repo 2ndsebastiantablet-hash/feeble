@@ -19,7 +19,7 @@ It is not a full Gorilla Tag clone. It is only a first browser-based test of han
 - Renders visible hand spheres so you can see your controller positions.
 - Lets you move by pushing your hands against the floor or test blocks.
 - Applies simple release momentum, gravity, floor collision, damping, and velocity clamping.
-- Keeps the VR camera at local zero so Quest uses your real tracked headset height instead of adding an extra fake 1.6 meter offset.
+- Pins the VR headset view to floor level by offsetting the rig against Quest's tracked headset height each frame.
 - Shows in-headset debug text for:
   - left hand touching
   - right hand touching

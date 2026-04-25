@@ -16,6 +16,7 @@
       debugText: { type: "selector" },
       handRadius: { default: 0.14 },
       floorHeight: { default: 0 },
+      cameraGroundOffset: { default: 0 },
       gravity: { default: 18 },
       airDamping: { default: 0.92 },
       groundDamping: { default: 0.72 },
@@ -43,6 +44,7 @@
       this.colliderMax = new THREE.Vector3();
       this.closestPoint = new THREE.Vector3();
       this.sampleVelocity = new THREE.Vector3();
+      this.headLocalPosition = new THREE.Vector3();
 
       this.leftTouching = false;
       this.rightTouching = false;
@@ -227,6 +229,15 @@
     },
 
     applyFloorCollision: function () {
+      if (this.data.head) {
+        // Keep the headset itself down at floor height by offsetting the rig by
+        // the tracked local headset Y position every frame.
+        this.headLocalPosition.copy(this.data.head.object3D.position);
+        this.rigPosition.y = this.data.floorHeight - this.headLocalPosition.y + this.data.cameraGroundOffset;
+        this.velocity.y = 0;
+        return;
+      }
+
       if (this.rigPosition.y < this.data.floorHeight) {
         this.rigPosition.y = this.data.floorHeight;
 
