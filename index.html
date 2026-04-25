@@ -8,7 +8,7 @@
   <!-- A-Frame includes WebXR support and creates the Enter VR button automatically. -->
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
   <script src="./gorilla-locomotion.js" defer></script>
-  <script src="./main.js" defer></script>
+  <script type="module" src="./main.js"></script>
 
   <style>
     body {
@@ -31,12 +31,88 @@
       max-width: 360px;
       line-height: 1.45;
     }
+
+    #multiplayer-ui {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 10;
+      width: min(420px, calc(100vw - 24px));
+      color: white;
+      background: rgba(0, 0, 0, 0.74);
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    #multiplayer-ui h2 {
+      margin: 0 0 8px;
+      font-size: 15px;
+    }
+
+    .mp-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    #multiplayer-ui input,
+    #multiplayer-ui button {
+      font: inherit;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    #multiplayer-ui input {
+      flex: 1 1 160px;
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+    }
+
+    #multiplayer-ui button {
+      cursor: pointer;
+      background: #235f9f;
+      color: white;
+    }
+
+    #multiplayer-status,
+    #public-lobbies {
+      margin-top: 8px;
+    }
+
+    #public-lobbies button {
+      margin-left: 6px;
+      padding: 4px 8px;
+    }
   </style>
 </head>
 <body>
   <div id="note">
     Open this page in Meta Quest Browser, press Enter VR, and push your hand spheres against the
     floor or blocks to move. Thumbsticks, teleport, and keyboard movement are intentionally disabled.
+  </div>
+  <div id="multiplayer-ui">
+    <h2>Multiplayer</h2>
+    <div class="mp-row">
+      <input id="api-base" placeholder="https://your-worker.workers.dev" />
+      <input id="player-name" value="Quest Player" />
+    </div>
+    <div class="mp-row">
+      <input id="lobby-name" value="Quest Room" />
+      <input id="lobby-code" placeholder="Private code" />
+    </div>
+    <div class="mp-row">
+      <button id="create-public">Create Public</button>
+      <button id="create-private">Create Private</button>
+      <button id="join-code">Join By Code</button>
+      <button id="refresh-lobbies">Refresh</button>
+      <button id="leave-lobby">Leave</button>
+    </div>
+    <div id="multiplayer-status">Multiplayer idle.</div>
+    <div id="public-lobbies"></div>
   </div>
 
   <a-scene
@@ -52,7 +128,7 @@
     <a-entity
       id="player-rig"
       position="0 0 4"
-      gorilla-locomotion="leftHand: #left-hand; rightHand: #right-hand; head: #player-camera; debugText: #debug-text; playerHeightOffset: 0.62"
+      gorilla-locomotion="leftHand: #left-hand; rightHand: #right-hand; head: #player-camera; debugText: #debug-text; playerHeightOffset: 0.68"
     >
       <a-camera id="player-camera" position="0 0 0" wasd-controls-enabled="false">
         <a-entity id="debug-panel" position="0 -0.12 -1.2">
@@ -133,6 +209,8 @@
         align="center"
       ></a-text>
     </a-plane>
+
+    <a-entity id="remote-players"></a-entity>
   </a-scene>
 </body>
 </html>

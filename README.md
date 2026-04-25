@@ -1,68 +1,91 @@
 # Quest Gorilla Locomotion Prototype
 
-This is a small WebXR locomotion prototype for Meta Quest Browser using A-Frame and plain JavaScript.
+This is a WebXR locomotion prototype for Meta Quest Browser using A-Frame and plain JavaScript.
 
-It is not a full Gorilla Tag clone. It is only a first browser-based test of hand-push locomotion.
+It now includes:
 
-## Files
+- Gorilla Tag-style hand locomotion
+- a Cloudflare Worker multiplayer backend adapted from the `fly-game` multiplayer template
+- a browser multiplayer client that syncs VR rig, head, and hand positions
+- simple remote player avatars rendered directly in the A-Frame scene
+
+## Frontend files
 
 - `index.html`
 - `main.js`
-- `README.md`
-- `netlify.toml`
-- `.nojekyll`
+- `gorilla-locomotion.js`
+- `frontend/multiplayer-client.js`
 
-## What it does
+## Multiplayer backend files
 
-- Shows the normal A-Frame `Enter VR` button.
-- Creates a player rig with a camera and left/right tracked controller entities.
-- Renders visible hand spheres so you can see your controller positions.
-- Lets you move by pushing your hands against the floor or test blocks.
-- Applies simple release momentum, gravity, floor collision, damping, and velocity clamping.
-- Pins the VR headset view to floor level by offsetting the rig against Quest's tracked headset height each frame.
-- Shows in-headset debug text for:
-  - left hand touching
-  - right hand touching
-  - player velocity
+- `backend/server.js`
+- `backend/lobby-manager.js`
+- `backend/realtime-server.js`
+- `backend/server-authority.js`
+- `backend/rate-limit.js`
+- `backend/utils.js`
+- `wrangler.toml`
+- `package.json`
 
-## How the movement works
+## What the multiplayer adaptation uses from the template
 
-Each frame, the prototype:
+The multiplayer system is based on the pinned template from:
 
-1. Reads the world position of the left and right hand/controller entities.
-2. Measures how far each hand moved since the previous frame.
-3. Checks whether each hand sphere overlaps the floor or a test block.
-4. If a hand is touching, moves the player rig in the opposite direction of that hand movement.
-5. If both hands are touching, averages the combined movement.
-6. Stores recent locomotion velocity so releasing your hands keeps a small launch effect.
-7. Applies gravity and damping when you are not actively pushing.
-8. Clamps movement and velocity so the browser prototype stays stable.
+- repo: `2ndsebastiantablet-hash/fly-game`
+- commit: `389610aa69a18eb56eadb228520a5f4dfd33109d`
+- folder: `multiplayer-template`
 
-This is intentionally simple and meant for debugging, not for perfect Gorilla Tag feel yet.
+Template pieces reused as the base:
 
-## How to deploy
+- public and private lobby flow
+- Durable Object lobby directory
+- one room Durable Object per lobby
+- reconnect support
+- WebSocket state sync
+- rate limiting and message validation
+- frontend `MultiplayerClient`
 
-1. Upload this folder to a static HTTPS host such as Netlify, GitHub Pages, or Cloudflare Pages.
-2. Make sure `index.html` is served from the site root.
-3. Do not add a build step. This project is already static.
+Game-specific adaptations made here:
 
-## How to test on Meta Quest
+- the server authority now accepts VR pose state instead of a 2D demo state
+- snapshots expose `youPlayerId` so the frontend can avoid rendering your own remote avatar
+- the frontend pushes `rig`, `head`, `leftHand`, and `rightHand` world positions from the A-Frame scene
+- the frontend renders remote players as simple head/body/hand avatars
 
-1. Open the deployed HTTPS URL in Meta Quest Browser.
-2. Wait for the page to load.
-3. Press `Enter VR`.
-4. Confirm you can see:
-   - the floor
-   - the test blocks
-   - the left and right hand spheres
-   - the debug text panel
-5. Push your hands against the floor or blocks and confirm the rig moves without thumbstick locomotion or teleport.
-6. Release after a strong push and confirm there is slight momentum.
-7. Confirm gravity brings you back down and the floor catches you.
+## How to run the frontend
+
+1. Deploy the root folder to a normal HTTPS static host such as Netlify, GitHub Pages, or Cloudflare Pages.
+2. Open the deployed site in a desktop browser or Meta Quest Browser.
+3. Enter your deployed Worker URL in the multiplayer panel before creating or joining a lobby.
+
+## How to run the multiplayer backend
+
+1. Install dependencies:
+   `npm install`
+2. Log into Cloudflare:
+   `npx wrangler login`
+3. Run locally:
+   `npm run dev`
+4. Deploy:
+   `npm run deploy`
+
+The Worker entry stays at `backend/server.js`, following the template layout.
+
+## How to test on Quest
+
+1. Deploy the static frontend to HTTPS.
+2. Deploy the Cloudflare Worker backend.
+3. Open the frontend URL in Meta Quest Browser.
+4. Enter the Worker URL in the multiplayer panel.
+5. Create or join a lobby.
+6. Press `Enter VR`.
+7. Confirm you can:
+   - move with hand locomotion
+   - see remote player avatars update live
+   - create public lobbies, private lobbies, and join by code
 
 ## Important notes
 
-- Keyboard movement, thumbstick locomotion, and teleport are not included.
-- Hand collision is simple on purpose and uses sphere-vs-floor and sphere-vs-box overlap checks.
-- The player body does not have a full physics capsule yet.
-- This is a first working prototype for Quest Browser testing, not final locomotion.
+- Thumbstick locomotion and teleport are still disabled.
+- This is still a prototype. The multiplayer sync is pose/state sync, not a full authoritative physics simulation.
+- The server-authoritative hooks live in `backend/server-authority.js`.
