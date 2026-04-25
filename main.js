@@ -53,6 +53,10 @@ window.addEventListener("DOMContentLoaded", function () {
     return;
   }
 
+  if (!apiBaseInput.value.trim()) {
+    apiBaseInput.value = window.location.origin;
+  }
+
   const defaultNote = note.textContent.trim();
   let client = null;
 
@@ -76,11 +80,7 @@ window.addEventListener("DOMContentLoaded", function () {
   }
 
   function ensureClient() {
-    const apiBase = apiBaseInput.value.trim();
-
-    if (!apiBase) {
-      throw new Error("Enter your multiplayer Worker URL first.");
-    }
+    const apiBase = apiBaseInput.value.trim() || window.location.origin;
 
     if (client && client.apiBase === apiBase) {
       return client;

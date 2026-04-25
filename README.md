@@ -52,13 +52,25 @@ Game-specific adaptations made here:
 - the frontend pushes `rig`, `head`, `leftHand`, and `rightHand` world positions from the A-Frame scene
 - the frontend renders remote players as simple head/body/hand avatars
 
-## How to run the frontend
+## How to run on Cloudflare
 
-1. Deploy the root folder to a normal HTTPS static host such as Netlify, GitHub Pages, or Cloudflare Pages.
-2. Open the deployed site in a desktop browser or Meta Quest Browser.
-3. Enter your deployed Worker URL in the multiplayer panel before creating or joining a lobby.
+This project now uses a single Cloudflare Worker deployment:
 
-## How to run the multiplayer backend
+- the main Worker URL serves the game frontend
+- the same Worker URL also serves the multiplayer API and WebSocket backend
+
+Worker entry:
+
+- `backend/server.js`
+
+Static assets served by the Worker:
+
+- `index.html`
+- `main.js`
+- `gorilla-locomotion.js`
+- `frontend/multiplayer-client.js`
+
+Deploy steps:
 
 1. Install dependencies:
    `npm install`
@@ -69,51 +81,43 @@ Game-specific adaptations made here:
 4. Deploy:
    `npm run deploy`
 
-The Worker entry stays at `backend/server.js`, following the template layout.
-
 ## How to test on Quest
 
-1. Deploy the static frontend to HTTPS.
-2. Deploy the Cloudflare Worker backend.
-3. Open the frontend URL in Meta Quest Browser.
-4. Enter the Worker URL in the multiplayer panel.
-5. Create or join a lobby.
-6. Press `Enter VR`.
-7. Confirm you can:
+1. Deploy the Cloudflare Worker.
+2. Open the Worker root URL in Meta Quest Browser.
+3. Press `Enter VR`.
+4. Confirm you can:
    - move with hand locomotion
    - see remote player avatars update live
    - create public lobbies, private lobbies, and join by code
 
+The multiplayer input now defaults to the current site origin, so when you open the deployed Worker URL it already points at the correct backend.
+
 ## Cloudflare deployment settings
 
-Use Cloudflare as two separate deployments:
+Use Cloudflare Workers, not Cloudflare Pages, for this deployment.
 
-- Frontend: Cloudflare Pages
-- Multiplayer backend: Cloudflare Workers with Durable Objects
-
-Do not try to deploy the Worker backend as a Pages build artifact.
-
-### Cloudflare Pages settings for the frontend
-
-- Project type: `Cloudflare Pages`
-- Production branch: `main`
-- Framework preset: `None`
-- Root directory: `/`
-- Build command: `npm run build`
-- Build output directory / publish directory: `.`
-
-Why these settings:
-
-- the frontend is already a static site in the repo root
-- `npm run build` is now a no-op success script so Pages can complete the build cleanly
-- the publish directory must stay `.` because `index.html`, `main.js`, and `gorilla-locomotion.js` live in the repo root
-
-### Cloudflare Workers settings for the multiplayer backend
+### Cloudflare Worker settings
 
 - Project type: `Cloudflare Worker`
 - Wrangler config: `wrangler.toml`
 - Worker entry file: `backend/server.js`
 - Deploy command: `npm install && npm run deploy`
+
+### Static asset settings in `wrangler.toml`
+
+- `directory = "."`
+- `binding = "ASSETS"`
+- `run_worker_first = true`
+
+This means:
+
+- `/` serves `index.html`
+- `/main.js` serves the frontend bootstrap
+- `/gorilla-locomotion.js` serves the locomotion script
+- `/frontend/multiplayer-client.js` serves the browser multiplayer client
+- `/api/*` stays on the Worker backend
+- `/ws` stays on the Worker backend
 
 ### Required environment variables
 
@@ -121,17 +125,11 @@ No extra required variables are needed to get the Worker running because the def
 
 For production, you should set:
 
-- `ALLOWED_ORIGIN` = your real Cloudflare Pages site URL instead of `*`
+- `ALLOWED_ORIGIN=<your deployed Worker origin>`
 
 Example:
 
-- `ALLOWED_ORIGIN=https://your-project.pages.dev`
-
-### Recommended deployment order
-
-1. Deploy the Worker first and copy its URL.
-2. Deploy the Pages frontend with the settings above.
-3. Open the site and paste the Worker URL into the multiplayer panel.
+- `ALLOWED_ORIGIN=https://feeble-multiplayer.your-subdomain.workers.dev`
 
 ## Important notes
 

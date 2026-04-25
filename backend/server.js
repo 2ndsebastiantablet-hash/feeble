@@ -4,6 +4,17 @@ import { corsHeaders, jsonResponse, readJson } from "./utils.js";
 
 export { LobbyDirectory, GameRoom };
 
+const PUBLIC_FRONTEND_PATHS = new Set([
+  "/",
+  "/index.html",
+  "/main.js",
+  "/gorilla-locomotion.js"
+]);
+
+function isFrontendAssetPath(pathname) {
+  return PUBLIC_FRONTEND_PATHS.has(pathname) || pathname.startsWith("/frontend/");
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -83,6 +94,18 @@ export default {
         }
 
         return lobbyService.connectSocket(request, lobbyId, sessionToken);
+      }
+
+      if ((request.method === "GET" || request.method === "HEAD") && isFrontendAssetPath(url.pathname)) {
+        if (!env.ASSETS) {
+          return new Response("Static assets are not configured for this Worker.", { status: 500 });
+        }
+
+        if (url.pathname === "/") {
+          return env.ASSETS.fetch(new URL("/index.html", request.url));
+        }
+
+        return env.ASSETS.fetch(request);
       }
 
       return jsonResponse({ ok: false, error: "Not found." }, 404, allowedOrigin);
