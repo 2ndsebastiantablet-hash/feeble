@@ -63,7 +63,7 @@ Worker entry:
 
 - `backend/server.js`
 
-Static assets served by the Worker:
+Static assets served by the Worker from `public/`:
 
 - `index.html`
 - `main.js`
@@ -106,7 +106,7 @@ Use Cloudflare Workers, not Cloudflare Pages, for this deployment.
 
 ### Static asset settings in `wrangler.toml`
 
-- `directory = "."`
+- `directory = "public"`
 - `binding = "ASSETS"`
 - `run_worker_first = true`
 
@@ -118,6 +118,9 @@ This means:
 - `/frontend/multiplayer-client.js` serves the browser multiplayer client
 - `/api/*` stays on the Worker backend
 - `/ws` stays on the Worker backend
+
+Only browser files should live in `public/`.
+Do not place `node_modules`, backend files, package files, or logs in that folder.
 
 ### Required environment variables
 
