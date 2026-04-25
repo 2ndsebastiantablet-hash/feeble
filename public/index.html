@@ -128,23 +128,9 @@
     <a-entity
       id="player-rig"
       position="0 0 4"
-      gorilla-locomotion="leftHand: #left-hand; rightHand: #right-hand; head: #player-camera; debugText: #debug-text; playerHeightOffset: 0.68"
+      gorilla-locomotion="leftHand: #left-hand; rightHand: #right-hand; head: #player-camera; playerHeightOffset: 0.68"
     >
-      <a-camera id="player-camera" position="0 0 0" wasd-controls-enabled="false">
-        <a-entity id="debug-panel" position="0 -0.12 -1.2">
-          <a-plane width="2.4" height="1.6" color="#111111" opacity="0.82"></a-plane>
-          <a-text
-            id="debug-text"
-            position="-1.09 0.66 0.01"
-            align="left"
-            anchor="left"
-            baseline="top"
-            width="2.2"
-            color="#FFFFFF"
-            value="Waiting for hand tracking..."
-          ></a-text>
-        </a-entity>
-      </a-camera>
+      <a-camera id="player-camera" position="0 0 0" wasd-controls-enabled="false"></a-camera>
 
       <a-entity id="left-hand" position="-0.35 -0.35 -0.4" tracked-controls="hand: left">
         <a-sphere id="left-hand-visual" radius="0.12" color="#FF7AA2" opacity="0.95"></a-sphere>
