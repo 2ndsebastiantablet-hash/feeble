@@ -1,68 +1,97 @@
-import { clamp } from "./utils.js";
+import { LobbyDirectory, LobbyService } from "./lobby-manager.js";
+import { GameRoom } from "./realtime-server.js";
+import { corsHeaders, jsonResponse, readJson } from "./utils.js";
 
-function sanitizeNumber(value, fallback = 0) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    return fallback;
-  }
+export { LobbyDirectory, GameRoom };
 
-  return clamp(parsed, -500, 500);
-}
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const allowedOrigin = env.ALLOWED_ORIGIN || "*";
+    const lobbyService = new LobbyService(env);
 
-function sanitizeVector(value, fallback = { x: 0, y: 0, z: 0 }) {
-  return {
-    x: sanitizeNumber(value?.x, fallback.x),
-    y: sanitizeNumber(value?.y, fallback.y),
-    z: sanitizeNumber(value?.z, fallback.z)
-  };
-}
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders(allowedOrigin)
+      });
+    }
 
-function sanitizeColor(value, fallback) {
-  const color = String(value || fallback).trim();
-  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback;
-}
-
-export const defaultAuthority = {
-  createInitialPlayerState() {
-    return {
-      rig: { x: 0, y: 0, z: 4 },
-      head: { x: 0, y: 1.6, z: 4 },
-      leftHand: { x: -0.35, y: 1.15, z: 3.6 },
-      rightHand: { x: 0.35, y: 1.15, z: 3.6 }
-    };
-  },
-
-  filterClientStateUpdate({ proposedState, proposedMeta }) {
-    const state = typeof proposedState === "object" && proposedState ? proposedState : {};
-    const meta = typeof proposedMeta === "object" && proposedMeta ? proposedMeta : {};
-
-    return {
-      state: {
-        rig: sanitizeVector(state.rig, { x: 0, y: 0, z: 4 }),
-        head: sanitizeVector(state.head, { x: 0, y: 1.6, z: 4 }),
-        leftHand: sanitizeVector(state.leftHand, { x: -0.35, y: 1.15, z: 3.6 }),
-        rightHand: sanitizeVector(state.rightHand, { x: 0.35, y: 1.15, z: 3.6 })
-      },
-      meta: {
-        headColor: sanitizeColor(meta.headColor, "#F2F5FF"),
-        bodyColor: sanitizeColor(meta.bodyColor, "#7A9BFF"),
-        leftHandColor: sanitizeColor(meta.leftHandColor, "#FF7AA2"),
-        rightHandColor: sanitizeColor(meta.rightHandColor, "#6FC3FF")
+    try {
+      if (request.method === "GET" && url.pathname === "/api/health") {
+        return jsonResponse(
+          {
+            ok: true,
+            status: "healthy",
+            runtime: "cloudflare-workers",
+            idleTimeoutMs: Number(env.IDLE_TIMEOUT_MS || 50000),
+            reconnectGraceMs: Number(env.RECONNECT_GRACE_MS || 20000),
+            maxPlayersPerLobby: Number(env.MAX_PLAYERS_PER_LOBBY || 12)
+          },
+          200,
+          allowedOrigin
+        );
       }
-    };
-  },
 
-  onPlayerJoin() {},
+      if (request.method === "GET" && url.pathname === "/api/lobbies/public") {
+        const data = await lobbyService.listPublicLobbies();
+        return jsonResponse(data, 200, allowedOrigin);
+      }
 
-  onPlayerLeave() {},
+      if (request.method === "POST" && url.pathname === "/api/lobbies/create") {
+        const body = await readJson(request);
+        const data = await lobbyService.createLobby(body);
+        return jsonResponse(data, 200, allowedOrigin);
+      }
 
-  onLobbyEmpty() {},
+      if (request.method === "POST" && url.pathname === "/api/lobbies/join") {
+        const body = await readJson(request);
+        const data = await lobbyService.joinLobby(body);
+        return jsonResponse(data, 200, allowedOrigin);
+      }
 
-  onBeforeBroadcast({ snapshot }) {
-    return snapshot;
-  },
+      if (request.method === "POST" && url.pathname === "/api/lobbies/restore") {
+        const body = await readJson(request);
+        const data = await lobbyService.restoreSession(body);
+        return jsonResponse(data, 200, allowedOrigin);
+      }
 
-  onCustomMessage() {
-    return { handled: false };
+      if (request.method === "POST" && url.pathname === "/api/lobbies/leave") {
+        const body = await readJson(request);
+        const data = await lobbyService.leaveLobby(body);
+        return jsonResponse(data, 200, allowedOrigin);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/lobbies/kick") {
+        const body = await readJson(request);
+        const data = await lobbyService.kickPlayer(body);
+        return jsonResponse(data, 200, allowedOrigin);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/lobbies/close") {
+        const body = await readJson(request);
+        const data = await lobbyService.closeLobby(body);
+        return jsonResponse(data, 200, allowedOrigin);
+      }
+
+      if (request.method === "GET" && url.pathname === "/ws") {
+        const lobbyId = url.searchParams.get("lobbyId");
+        const sessionToken = url.searchParams.get("sessionToken");
+
+        if (!lobbyId || !sessionToken) {
+          return new Response("Missing lobbyId or sessionToken.", { status: 400 });
+        }
+
+        return lobbyService.connectSocket(request, lobbyId, sessionToken);
+      }
+
+      return jsonResponse({ ok: false, error: "Not found." }, 404, allowedOrigin);
+    } catch (error) {
+      return jsonResponse(
+        { ok: false, error: error.message || "Request failed." },
+        400,
+        allowedOrigin
+      );
+    }
   }
 };

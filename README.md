@@ -84,6 +84,55 @@ The Worker entry stays at `backend/server.js`, following the template layout.
    - see remote player avatars update live
    - create public lobbies, private lobbies, and join by code
 
+## Cloudflare deployment settings
+
+Use Cloudflare as two separate deployments:
+
+- Frontend: Cloudflare Pages
+- Multiplayer backend: Cloudflare Workers with Durable Objects
+
+Do not try to deploy the Worker backend as a Pages build artifact.
+
+### Cloudflare Pages settings for the frontend
+
+- Project type: `Cloudflare Pages`
+- Production branch: `main`
+- Framework preset: `None`
+- Root directory: `/`
+- Build command: `npm run build`
+- Build output directory / publish directory: `.`
+
+Why these settings:
+
+- the frontend is already a static site in the repo root
+- `npm run build` is now a no-op success script so Pages can complete the build cleanly
+- the publish directory must stay `.` because `index.html`, `main.js`, and `gorilla-locomotion.js` live in the repo root
+
+### Cloudflare Workers settings for the multiplayer backend
+
+- Project type: `Cloudflare Worker`
+- Wrangler config: `wrangler.toml`
+- Worker entry file: `backend/server.js`
+- Deploy command: `npm install && npm run deploy`
+
+### Required environment variables
+
+No extra required variables are needed to get the Worker running because the defaults already exist in `wrangler.toml`.
+
+For production, you should set:
+
+- `ALLOWED_ORIGIN` = your real Cloudflare Pages site URL instead of `*`
+
+Example:
+
+- `ALLOWED_ORIGIN=https://your-project.pages.dev`
+
+### Recommended deployment order
+
+1. Deploy the Worker first and copy its URL.
+2. Deploy the Pages frontend with the settings above.
+3. Open the site and paste the Worker URL into the multiplayer panel.
+
 ## Important notes
 
 - Thumbstick locomotion and teleport are still disabled.
