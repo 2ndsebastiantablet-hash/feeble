@@ -16,6 +16,11 @@ It now includes:
 - `gorilla-locomotion.js`
 - `frontend/multiplayer-client.js`
 
+## Reusable Templates
+
+- `templates/simple-vr-scene` = minimal Quest WebXR/A-Frame starter
+- `templates/gorilla-tag-locomotion` = Gorilla Tag-style WebXR hand movement starter
+
 ## Multiplayer backend files
 
 - `backend/server.js`
