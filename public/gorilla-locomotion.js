@@ -143,7 +143,7 @@
     },
 
     tock: function (time, deltaMs) {
-      if (!this.data.leftHand || !this.data.rightHand || !this.data.head || !this.data.debugText) {
+      if (!this.data.leftHand || !this.data.rightHand || !this.data.head) {
         return;
       }
 
