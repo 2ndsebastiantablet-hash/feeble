@@ -14,10 +14,10 @@
       rightHand: { type: "selector" },
       head: { type: "selector" },
       debugText: { type: "selector" },
-      handRadius: { default: 0.05 },
+      handRadius: { default: 0.12 },
       headRadius: { default: 0.2 },
       bodyRadius: { default: 0.35 },
-      bodyOffsetY: { default: 0.4 },
+      bodyOffsetY: { default: 1.2 },
       floorHeight: { default: 0 },
       maxArmLength: { default: 1.5 },
       unStickDistance: { default: 1.0 },
@@ -55,6 +55,9 @@
       this.gravityHandOffset = new THREE.Vector3();
       this.headCollisionPosition = new THREE.Vector3();
       this.bodyCollisionPosition = new THREE.Vector3();
+      this.leftDisplayPosition = new THREE.Vector3();
+      this.rightDisplayPosition = new THREE.Vector3();
+      this.tempLocalPosition = new THREE.Vector3();
 
       this.collisionPush = new THREE.Vector3();
       this.totalPush = new THREE.Vector3();
@@ -89,12 +92,15 @@
       this.colliders = Array.from(
         this.el.sceneEl.querySelectorAll("[locomotion-collider]")
       );
+      this.leftHandVisual = this.el.sceneEl.querySelector("#left-hand-visual");
+      this.rightHandVisual = this.el.sceneEl.querySelector("#right-hand-visual");
 
       this.getCurrentLeftHandPosition(this.lastLeftHandPosition);
       this.getCurrentRightHandPosition(this.lastRightHandPosition);
       this.getHeadPosition(this.lastHeadPosition);
       this.lastPosition.copy(this.rigPosition);
       this.hasInitializedHands = true;
+      this.updateHandVisuals(this.lastLeftHandPosition, this.lastRightHandPosition);
       this.updateDebugText(false, false);
     },
 
@@ -240,6 +246,9 @@
 
       this.wasLeftHandTouching = leftHandColliding;
       this.wasRightHandTouching = rightHandColliding;
+      this.leftDisplayPosition.copy(leftHandColliding ? this.lastLeftHandPosition : this.currentLeftHand);
+      this.rightDisplayPosition.copy(rightHandColliding ? this.lastRightHandPosition : this.currentRightHand);
+      this.updateHandVisuals(this.leftDisplayPosition, this.rightDisplayPosition);
       this.updateDebugText(leftHandColliding, rightHandColliding);
     },
 
@@ -426,6 +435,20 @@
         if (Math.abs(this.totalPush.y) > 0.01) {
           this.velocity.y = 0;
         }
+      }
+    },
+
+    updateHandVisuals: function (leftWorldPosition, rightWorldPosition) {
+      if (this.leftHandVisual) {
+        this.tempLocalPosition.copy(leftWorldPosition);
+        this.data.leftHand.object3D.worldToLocal(this.tempLocalPosition);
+        this.leftHandVisual.object3D.position.copy(this.tempLocalPosition);
+      }
+
+      if (this.rightHandVisual) {
+        this.tempLocalPosition.copy(rightWorldPosition);
+        this.data.rightHand.object3D.worldToLocal(this.tempLocalPosition);
+        this.rightHandVisual.object3D.position.copy(this.tempLocalPosition);
       }
     },
 

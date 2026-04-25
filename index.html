@@ -51,7 +51,7 @@
 
     <a-entity
       id="player-rig"
-      position="0 -0.4 4"
+      position="0 -1.15 4"
       gorilla-locomotion="leftHand: #left-hand; rightHand: #right-hand; head: #player-camera; debugText: #debug-text"
     >
       <a-camera id="player-camera" position="0 0 0" wasd-controls-enabled="false">
@@ -69,11 +69,11 @@
       </a-camera>
 
       <a-entity id="left-hand" position="-0.35 -0.35 -0.4" tracked-controls="hand: left">
-        <a-sphere radius="0.12" color="#FF7AA2" opacity="0.95"></a-sphere>
+        <a-sphere id="left-hand-visual" radius="0.12" color="#FF7AA2" opacity="0.95"></a-sphere>
       </a-entity>
 
       <a-entity id="right-hand" position="0.35 -0.35 -0.4" tracked-controls="hand: right">
-        <a-sphere radius="0.12" color="#6FC3FF" opacity="0.95"></a-sphere>
+        <a-sphere id="right-hand-visual" radius="0.12" color="#6FC3FF" opacity="0.95"></a-sphere>
       </a-entity>
     </a-entity>
 
