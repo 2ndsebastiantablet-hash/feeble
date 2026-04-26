@@ -25,20 +25,25 @@ const avatarMap = new Map();
 
 AFRAME.registerComponent("menu-interactor", {
   schema: {
-    defaultLength: { default: 4.5 }
+    defaultLength: { default: 4.5 },
+    triggerThreshold: { default: 0.7 }
   },
 
   init: function () {
     this.onTriggerDown = this.onTriggerDown.bind(this);
+    this.onMouseDown = this.onMouseDown.bind(this);
     this.hoveredEl = null;
+    this.wasTriggerPressed = false;
   },
 
   play: function () {
     this.el.addEventListener("triggerdown", this.onTriggerDown);
+    this.el.addEventListener("mousedown", this.onMouseDown);
   },
 
   pause: function () {
     this.el.removeEventListener("triggerdown", this.onTriggerDown);
+    this.el.removeEventListener("mousedown", this.onMouseDown);
   },
 
   tick: function () {
@@ -60,21 +65,60 @@ AFRAME.registerComponent("menu-interactor", {
 
     const lineLength = intersection ? intersection.distance : this.data.defaultLength;
     this.el.setAttribute("line", "end", "0 0 " + (-lineLength));
+
+    const triggerPressed = this.isTriggerPressed();
+
+    if (triggerPressed && !this.wasTriggerPressed) {
+      this.activateHoveredButton();
+    }
+
+    this.wasTriggerPressed = triggerPressed;
   },
 
   onTriggerDown: function () {
+    this.activateHoveredButton();
+  },
+
+  onMouseDown: function () {
+    this.activateHoveredButton();
+  },
+
+  isTriggerPressed: function () {
+    const trackedControls = this.el.components["tracked-controls"];
+    const controller = trackedControls?.controller;
+
+    if (!controller?.buttons?.length) {
+      return false;
+    }
+
+    const triggerButton = controller.buttons[0];
+
+    if (!triggerButton) {
+      return false;
+    }
+
+    return Boolean(triggerButton.pressed || triggerButton.value >= this.data.triggerThreshold);
+  },
+
+  activateHoveredButton: function () {
+    const button = this.hoveredEl || this.getHoveredButtonFromRay();
+
+    if (!button) {
+      return;
+    }
+
+    button.emit("click");
+  },
+
+  getHoveredButtonFromRay: function () {
     const raycaster = this.el.components.raycaster;
     const intersection = raycaster?.intersections?.[0] || null;
 
     if (!intersection) {
-      return;
+      return null;
     }
 
-    const button = findMenuButton(intersection.object.el);
-
-    if (button) {
-      button.emit("click");
-    }
+    return findMenuButton(intersection.object.el);
   }
 });
 
