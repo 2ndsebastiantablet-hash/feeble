@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quest VR Prototype</title>
+  <title>FEEBLE</title>
 
   <!-- A-Frame includes WebXR support and creates the Enter VR button automatically. -->
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
@@ -31,88 +31,13 @@
       max-width: 360px;
       line-height: 1.45;
     }
-
-    #multiplayer-ui {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      z-index: 10;
-      width: min(420px, calc(100vw - 24px));
-      color: white;
-      background: rgba(0, 0, 0, 0.74);
-      padding: 12px;
-      border-radius: 10px;
-      font-size: 13px;
-      line-height: 1.4;
-    }
-
-    #multiplayer-ui h2 {
-      margin: 0 0 8px;
-      font-size: 15px;
-    }
-
-    .mp-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 8px;
-    }
-
-    #multiplayer-ui input,
-    #multiplayer-ui button {
-      font: inherit;
-      padding: 8px 10px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-    }
-
-    #multiplayer-ui input {
-      flex: 1 1 160px;
-      background: rgba(255, 255, 255, 0.08);
-      color: white;
-    }
-
-    #multiplayer-ui button {
-      cursor: pointer;
-      background: #235f9f;
-      color: white;
-    }
-
-    #multiplayer-status,
-    #public-lobbies {
-      margin-top: 8px;
-    }
-
-    #public-lobbies button {
-      margin-left: 6px;
-      padding: 4px 8px;
-    }
   </style>
 </head>
 <body>
   <div id="note">
-    Open this page in Meta Quest Browser, press Enter VR, use the left joystick to move, and press
-    the right A button to jump.
-  </div>
-  <div id="multiplayer-ui">
-    <h2>Multiplayer</h2>
-    <div class="mp-row">
-      <input id="api-base" placeholder="https://your-worker.workers.dev" />
-      <input id="player-name" value="Quest Player" />
-    </div>
-    <div class="mp-row">
-      <input id="lobby-name" value="Quest Room" />
-      <input id="lobby-code" placeholder="Private code" />
-    </div>
-    <div class="mp-row">
-      <button id="create-public">Create Public</button>
-      <button id="create-private">Create Private</button>
-      <button id="join-code">Join By Code</button>
-      <button id="refresh-lobbies">Refresh</button>
-      <button id="leave-lobby">Leave</button>
-    </div>
-    <div id="multiplayer-status">Multiplayer idle.</div>
-    <div id="public-lobbies"></div>
+    Open this page in Meta Quest Browser, press Enter VR, aim at the VR menu with a controller
+    trigger, move with the left joystick, turn with the right joystick, jump with the right A
+    button, and grab objects with either grip button.
   </div>
 
   <a-scene
@@ -132,12 +57,121 @@
     >
       <a-camera id="player-camera" position="0 0 0" wasd-controls-enabled="false"></a-camera>
 
-      <a-entity id="left-hand" position="-0.25 1.2 -0.5" oculus-touch-controls="hand: left">
+      <a-entity
+        id="left-hand"
+        position="-0.25 1.2 -0.5"
+        oculus-touch-controls="hand: left"
+        raycaster="objects: .menu-hitbox; far: 8"
+        line="color: #FF7AA2; opacity: 0.85"
+        menu-interactor="defaultLength: 4.5"
+        hand-grabber
+      >
         <a-sphere id="left-hand-visual" radius="0.12" color="#FF7AA2" opacity="0.95"></a-sphere>
       </a-entity>
 
-      <a-entity id="right-hand" position="0.25 1.2 -0.5" oculus-touch-controls="hand: right">
+      <a-entity
+        id="right-hand"
+        position="0.25 1.2 -0.5"
+        oculus-touch-controls="hand: right"
+        raycaster="objects: .menu-hitbox; far: 8"
+        line="color: #6FC3FF; opacity: 0.85"
+        menu-interactor="defaultLength: 4.5"
+        hand-grabber
+      >
         <a-sphere id="right-hand-visual" radius="0.12" color="#6FC3FF" opacity="0.95"></a-sphere>
+      </a-entity>
+
+      <a-entity id="main-menu" position="0 1.55 -1.85">
+        <a-plane width="2.8" height="1.85" color="#102032" opacity="0.92"></a-plane>
+        <a-text
+          value="FEEBLE"
+          position="0 0.52 0.02"
+          align="center"
+          color="#FFFFFF"
+          width="4.8"
+        ></a-text>
+        <a-text
+          value="VR Prototype"
+          position="0 0.18 0.02"
+          align="center"
+          color="#A8D6FF"
+          width="3.8"
+        ></a-text>
+        <a-text
+          value="Trigger = menu select | Grip = grab object"
+          position="0 -0.12 0.02"
+          align="center"
+          color="#EAF4FF"
+          width="3.4"
+          wrap-count="28"
+        ></a-text>
+        <a-plane
+          id="play-button"
+          class="menu-hitbox"
+          position="0 -0.58 0.03"
+          width="1.2"
+          height="0.34"
+          color="#235F9F"
+        >
+          <a-text
+            value="Play"
+            position="0 0 0.01"
+            align="center"
+            color="#FFFFFF"
+            width="3"
+          ></a-text>
+        </a-plane>
+      </a-entity>
+
+      <a-entity id="multiplayer-menu" position="1.18 1.45 -1.55" rotation="0 -18 0" visible="false">
+        <a-plane width="2.55" height="2.2" color="#0E1A29" opacity="0.9"></a-plane>
+        <a-text
+          value="Multiplayer"
+          position="0 0.86 0.02"
+          align="center"
+          color="#FFFFFF"
+          width="3.8"
+        ></a-text>
+        <a-text
+          id="menu-status-text"
+          value="Press a button to start."
+          position="0 0.58 0.02"
+          align="center"
+          color="#DCEEFF"
+          width="3.1"
+          wrap-count="28"
+        ></a-text>
+        <a-text
+          id="menu-code-text"
+          value="Private code: none"
+          position="0 0.32 0.02"
+          align="center"
+          color="#B9D7FF"
+          width="2.9"
+          wrap-count="28"
+        ></a-text>
+
+        <a-plane id="create-public-button" class="menu-hitbox" position="-0.6 -0.02 0.03" width="0.95" height="0.24" color="#2B7A78">
+          <a-text value="Create Public" position="0 0 0.01" align="center" color="#FFFFFF" width="2.2"></a-text>
+        </a-plane>
+        <a-plane id="create-private-button" class="menu-hitbox" position="0.6 -0.02 0.03" width="0.95" height="0.24" color="#7A4BC2">
+          <a-text value="Create Private" position="0 0 0.01" align="center" color="#FFFFFF" width="2.2"></a-text>
+        </a-plane>
+        <a-plane id="refresh-lobbies-button" class="menu-hitbox" position="-0.6 -0.34 0.03" width="0.95" height="0.24" color="#235F9F">
+          <a-text value="Refresh List" position="0 0 0.01" align="center" color="#FFFFFF" width="2.2"></a-text>
+        </a-plane>
+        <a-plane id="leave-lobby-button" class="menu-hitbox" position="0.6 -0.34 0.03" width="0.95" height="0.24" color="#9E3D3D">
+          <a-text value="Leave Lobby" position="0 0 0.01" align="center" color="#FFFFFF" width="2.2"></a-text>
+        </a-plane>
+
+        <a-text
+          value="Public Lobbies"
+          position="0 -0.64 0.02"
+          align="center"
+          color="#FFFFFF"
+          width="2.8"
+        ></a-text>
+        <a-entity id="public-lobbies-panel" position="0 -0.98 0.03"></a-entity>
       </a-entity>
     </a-entity>
 
@@ -186,9 +220,46 @@
       locomotion-collider="type: box; size: 6 2.5 0.6"
     ></a-box>
 
+    <a-box
+      class="grabbable-object"
+      grabbable
+      position="-1 1.05 -2"
+      width="0.28"
+      height="0.28"
+      depth="0.28"
+      color="#FFB347"
+    ></a-box>
+
+    <a-sphere
+      class="grabbable-object"
+      grabbable
+      position="1.15 1.15 -2.35"
+      radius="0.18"
+      color="#7FDBFF"
+    ></a-sphere>
+
+    <a-cylinder
+      class="grabbable-object"
+      grabbable
+      position="-2.3 1.05 -3.6"
+      radius="0.14"
+      height="0.42"
+      color="#F78FB3"
+    ></a-cylinder>
+
+    <a-box
+      class="grabbable-object"
+      grabbable
+      position="2.45 1.15 -3.2"
+      width="0.22"
+      height="0.42"
+      depth="0.22"
+      color="#9BFF9B"
+    ></a-box>
+
     <a-plane position="0 2.8 -3" width="4.8" height="0.9" color="#FFFFFF">
       <a-text
-        value="Quest VR Prototype"
+        value="FEEBLE"
         position="0 0 0.01"
         color="#111111"
         width="4.35"
