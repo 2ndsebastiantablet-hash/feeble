@@ -26,30 +26,45 @@ const avatarMap = new Map();
 AFRAME.registerComponent("menu-interactor", {
   schema: {
     defaultLength: { default: 4.5 },
-    triggerThreshold: { default: 0.7 }
+    triggerThreshold: { default: 0.7 },
+    buttonSelector: { default: ".vr-button" }
   },
 
   init: function () {
     this.onTriggerDown = this.onTriggerDown.bind(this);
     this.onMouseDown = this.onMouseDown.bind(this);
+    this.onInputEvent = this.onInputEvent.bind(this);
     this.hoveredEl = null;
     this.wasTriggerPressed = false;
+    this.lastSelectedId = "none";
+    this.lastInputEvent = "none";
+    this.raycaster = new THREE.Raycaster();
+    this.rayOrigin = new THREE.Vector3();
+    this.rayDirection = new THREE.Vector3();
+    this.worldQuaternion = new THREE.Quaternion();
   },
 
   play: function () {
     this.el.addEventListener("triggerdown", this.onTriggerDown);
     this.el.addEventListener("mousedown", this.onMouseDown);
+    this.el.addEventListener("triggerup", this.onInputEvent);
+    this.el.addEventListener("triggerchanged", this.onInputEvent);
+    this.el.addEventListener("buttondown", this.onInputEvent);
+    this.el.addEventListener("buttonup", this.onInputEvent);
   },
 
   pause: function () {
     this.el.removeEventListener("triggerdown", this.onTriggerDown);
     this.el.removeEventListener("mousedown", this.onMouseDown);
+    this.el.removeEventListener("triggerup", this.onInputEvent);
+    this.el.removeEventListener("triggerchanged", this.onInputEvent);
+    this.el.removeEventListener("buttondown", this.onInputEvent);
+    this.el.removeEventListener("buttonup", this.onInputEvent);
   },
 
   tick: function () {
-    const raycaster = this.el.components.raycaster;
-    const intersection = raycaster?.intersections?.[0] || null;
-    const nextHovered = intersection ? findMenuButton(intersection.object.el) : null;
+    const hit = this.getClosestButtonHit();
+    const nextHovered = hit ? hit.button : null;
 
     if (nextHovered !== this.hoveredEl) {
       if (this.hoveredEl) {
@@ -63,7 +78,7 @@ AFRAME.registerComponent("menu-interactor", {
       }
     }
 
-    const lineLength = intersection ? intersection.distance : this.data.defaultLength;
+    const lineLength = hit ? hit.distance : this.data.defaultLength;
     this.el.setAttribute("line", "end", "0 0 " + (-lineLength));
 
     const triggerPressed = this.isTriggerPressed();
@@ -73,25 +88,33 @@ AFRAME.registerComponent("menu-interactor", {
     }
 
     this.wasTriggerPressed = triggerPressed;
+    this.updateDebugText(hit, triggerPressed);
   },
 
   onTriggerDown: function () {
+    this.lastInputEvent = "triggerdown";
     this.activateHoveredButton();
   },
 
   onMouseDown: function () {
+    this.lastInputEvent = "mousedown";
     this.activateHoveredButton();
+  },
+
+  onInputEvent: function (event) {
+    this.lastInputEvent = event.type;
   },
 
   isTriggerPressed: function () {
     const trackedControls = this.el.components["tracked-controls"];
     const controller = trackedControls?.controller;
+    const gamepad = controller?.gamepad || controller;
 
-    if (!controller?.buttons?.length) {
+    if (!gamepad?.buttons?.length) {
       return false;
     }
 
-    const triggerButton = controller.buttons[0];
+    const triggerButton = gamepad.buttons[0];
 
     if (!triggerButton) {
       return false;
@@ -101,24 +124,77 @@ AFRAME.registerComponent("menu-interactor", {
   },
 
   activateHoveredButton: function () {
-    const button = this.hoveredEl || this.getHoveredButtonFromRay();
+    const hit = this.getClosestButtonHit();
+    const button = hit ? hit.button : this.hoveredEl;
 
     if (!button) {
       return;
     }
 
+    this.lastSelectedId = button.id || button.getAttribute("id") || "unnamed";
     button.emit("click");
   },
 
-  getHoveredButtonFromRay: function () {
-    const raycaster = this.el.components.raycaster;
-    const intersection = raycaster?.intersections?.[0] || null;
+  getClosestButtonHit: function () {
+    const buttons = Array.from(document.querySelectorAll(this.data.buttonSelector));
+    const meshes = [];
 
-    if (!intersection) {
+    if (!buttons.length) {
       return null;
     }
 
-    return findMenuButton(intersection.object.el);
+    this.el.sceneEl.object3D.updateMatrixWorld(true);
+    this.el.object3D.getWorldPosition(this.rayOrigin);
+    this.el.object3D.getWorldQuaternion(this.worldQuaternion);
+    this.rayDirection.set(0, 0, -1).applyQuaternion(this.worldQuaternion).normalize();
+
+    this.raycaster.set(this.rayOrigin, this.rayDirection);
+    this.raycaster.far = this.data.defaultLength;
+
+    for (const button of buttons) {
+      const mesh = button.getObject3D("mesh");
+
+      if (!mesh) {
+        continue;
+      }
+
+      mesh.traverse(function (node) {
+        node.userData.buttonEl = button;
+        meshes.push(node);
+      });
+    }
+
+    const intersections = this.raycaster.intersectObjects(meshes, false);
+    const hit = intersections.find(function (intersection) {
+      return Boolean(findButtonFromObject(intersection.object));
+    });
+
+    if (!hit) {
+      return null;
+    }
+
+    return {
+      button: findButtonFromObject(hit.object),
+      distance: hit.distance
+    };
+  },
+
+  updateDebugText: function (hit, triggerPressed) {
+    const debugEl = document.getElementById("menu-debug-text");
+
+    if (!debugEl) {
+      return;
+    }
+
+    const hitId = hit?.button?.id || hit?.button?.getAttribute("id") || "none";
+    debugEl.setAttribute(
+      "value",
+      "Ray hit: " + Boolean(hit) +
+      "\nHit button: " + hitId +
+      "\nTrigger pressed: " + triggerPressed +
+      "\nLast input: " + this.lastInputEvent +
+      "\nLast selected: " + this.lastSelectedId
+    );
   }
 });
 
@@ -506,7 +582,7 @@ function createMenuButton(options) {
   const text = document.createElement("a-text");
 
   button.setAttribute("id", options.id);
-  button.setAttribute("class", "menu-hitbox");
+  button.setAttribute("class", "menu-hitbox vr-button");
   button.setAttribute("position", options.position);
   button.setAttribute("width", options.width);
   button.setAttribute("height", options.height);
@@ -542,6 +618,20 @@ function findMenuButton(startEl) {
     }
 
     el = el.parentEl;
+  }
+
+  return null;
+}
+
+function findButtonFromObject(object3D) {
+  let current = object3D;
+
+  while (current) {
+    if (current.userData?.buttonEl) {
+      return current.userData.buttonEl;
+    }
+
+    current = current.parent;
   }
 
   return null;
