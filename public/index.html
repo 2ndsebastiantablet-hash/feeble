@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FEEBLE</title>
 
-  <!-- A-Frame includes WebXR support and creates the Enter VR button automatically. -->
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
   <script src="./gorilla-locomotion.js" defer></script>
   <script type="module" src="./main.js"></script>
@@ -24,36 +23,57 @@
       left: 12px;
       z-index: 10;
       color: white;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(0, 0, 0, 0.65);
       padding: 10px 12px;
       border-radius: 8px;
       font-size: 14px;
       max-width: 360px;
       line-height: 1.45;
     }
-
   </style>
 </head>
 <body>
   <div id="note">
-    Open this page in Meta Quest Browser, press Enter VR, aim at the VR menu with a controller
-    trigger, move with the left joystick, turn with the right joystick, jump with the right A
-    button, and grab objects with either grip button.
+    Loading the Neighborhood hub...
   </div>
 
   <a-scene
     renderer="antialias: true; colorManagement: true"
     vr-mode-ui="enabled: true"
-    background="color: #CFE8FF"
+    fog="type: linear; color: #DDEED5; near: 40; far: 120"
+    day-night-cycle="dayDuration: 120; nightDuration: 720; maxDays: 5"
   >
-    <a-entity light="type: ambient; intensity: 0.7"></a-entity>
-    <a-entity light="type: directional; intensity: 0.9" position="3 6 2"></a-entity>
+    <a-entity id="ambient-light" light="type: ambient; intensity: 0.64; color: #FFFFFF"></a-entity>
+    <a-entity id="sun-light" light="type: directional; intensity: 1.05; color: #FFF2C4" position="12 34 -48"></a-entity>
+    <a-entity id="moon-light" light="type: directional; intensity: 0.08; color: #8AA0FF" position="-10 20 -48"></a-entity>
 
-    <a-sky color="#CFE8FF"></a-sky>
+    <a-sky id="sky" color="#DDF1FF"></a-sky>
+    <a-sphere id="sun" position="0 36 -80" radius="3.8" color="#FFF3BF" shader="flat"></a-sphere>
+    <a-sphere id="moon" position="0 30 -80" radius="2.7" color="#DCE4FF" shader="flat" visible="false"></a-sphere>
+
+    <a-entity id="cycle-display" position="0 18 -28" face-player="target: #player-camera">
+      <a-plane width="10.5" height="2.9" color="#09111C" opacity="0.48"></a-plane>
+      <a-text
+        id="cycle-phase"
+        value="DAY 1 / 5   NIGHT IN"
+        position="0 0.56 0.02"
+        align="center"
+        color="#F8FBFF"
+        width="11"
+      ></a-text>
+      <a-text
+        id="cycle-timer"
+        value="02:00"
+        position="0 -0.34 0.02"
+        align="center"
+        color="#FFF4C7"
+        width="18"
+      ></a-text>
+    </a-entity>
 
     <a-entity
       id="player-rig"
-      position="0 0 4"
+      position="0 0 8"
       simple-vr-locomotion="leftController: #left-hand; rightController: #right-hand; camera: #player-camera"
     >
       <a-camera id="player-camera" position="0 0 0" wasd-controls-enabled="false"></a-camera>
@@ -62,8 +82,6 @@
         id="left-hand"
         position="-0.25 1.2 -0.5"
         oculus-touch-controls="hand: left"
-        line="color: #FF7AA2; opacity: 0.85"
-        menu-interactor="defaultLength: 4.5"
         hand-grabber
       >
         <a-sphere id="left-hand-visual" radius="0.12" color="#FF7AA2" opacity="0.95"></a-sphere>
@@ -73,208 +91,53 @@
         id="right-hand"
         position="0.25 1.2 -0.5"
         oculus-touch-controls="hand: right"
-        line="color: #6FC3FF; opacity: 0.85"
-        menu-interactor="defaultLength: 4.5"
         hand-grabber
       >
         <a-sphere id="right-hand-visual" radius="0.12" color="#6FC3FF" opacity="0.95"></a-sphere>
-      </a-entity>
-
-      <a-entity id="main-menu" position="0 1.55 -1.85">
-        <a-plane width="2.8" height="1.85" color="#102032" opacity="0.92"></a-plane>
-        <a-text
-          value="FEEBLE"
-          position="0 0.52 0.02"
-          align="center"
-          color="#FFFFFF"
-          width="4.8"
-        ></a-text>
-        <a-text
-          value="VR Prototype"
-          position="0 0.18 0.02"
-          align="center"
-          color="#A8D6FF"
-          width="3.8"
-        ></a-text>
-        <a-text
-          value="Trigger = menu select | Grip = grab object"
-          position="0 -0.12 0.02"
-          align="center"
-          color="#EAF4FF"
-          width="3.4"
-          wrap-count="28"
-        ></a-text>
-        <a-plane
-          id="play-button"
-          class="menu-hitbox vr-button"
-          position="0 -0.58 0.03"
-          width="1.2"
-          height="0.34"
-          color="#235F9F"
-        >
-          <a-text
-            value="Play"
-            position="0 0 0.01"
-            align="center"
-            color="#FFFFFF"
-            width="3"
-          ></a-text>
-        </a-plane>
-      </a-entity>
-
-      <a-entity id="multiplayer-menu" position="1.18 1.45 -1.55" rotation="0 -18 0" visible="false">
-        <a-plane width="2.55" height="2.2" color="#0E1A29" opacity="0.9"></a-plane>
-        <a-text
-          value="Multiplayer"
-          position="0 0.86 0.02"
-          align="center"
-          color="#FFFFFF"
-          width="3.8"
-        ></a-text>
-        <a-text
-          id="menu-status-text"
-          value="Press a button to start."
-          position="0 0.58 0.02"
-          align="center"
-          color="#DCEEFF"
-          width="3.1"
-          wrap-count="28"
-        ></a-text>
-        <a-text
-          id="menu-code-text"
-          value="Private code: none"
-          position="0 0.32 0.02"
-          align="center"
-          color="#B9D7FF"
-          width="2.9"
-          wrap-count="28"
-        ></a-text>
-
-        <a-plane id="create-public-button" class="menu-hitbox vr-button" position="-0.6 -0.02 0.03" width="0.95" height="0.24" color="#2B7A78">
-          <a-text value="Create Public" position="0 0 0.01" align="center" color="#FFFFFF" width="2.2"></a-text>
-        </a-plane>
-        <a-plane id="create-private-button" class="menu-hitbox vr-button" position="0.6 -0.02 0.03" width="0.95" height="0.24" color="#7A4BC2">
-          <a-text value="Create Private" position="0 0 0.01" align="center" color="#FFFFFF" width="2.2"></a-text>
-        </a-plane>
-        <a-plane id="refresh-lobbies-button" class="menu-hitbox vr-button" position="-0.6 -0.34 0.03" width="0.95" height="0.24" color="#235F9F">
-          <a-text value="Refresh List" position="0 0 0.01" align="center" color="#FFFFFF" width="2.2"></a-text>
-        </a-plane>
-        <a-plane id="leave-lobby-button" class="menu-hitbox vr-button" position="0.6 -0.34 0.03" width="0.95" height="0.24" color="#9E3D3D">
-          <a-text value="Leave Lobby" position="0 0 0.01" align="center" color="#FFFFFF" width="2.2"></a-text>
-        </a-plane>
-
-        <a-text
-          value="Public Lobbies"
-          position="0 -0.64 0.02"
-          align="center"
-          color="#FFFFFF"
-          width="2.8"
-        ></a-text>
-        <a-entity id="public-lobbies-panel" position="0 -0.98 0.03"></a-entity>
-        <a-text
-          id="menu-debug-text"
-          value="Ray hit: false"
-          position="0 -1.44 0.02"
-          align="center"
-          color="#CDE5FF"
-          width="2.7"
-          wrap-count="34"
-        ></a-text>
       </a-entity>
     </a-entity>
 
     <a-plane
       position="0 0 0"
       rotation="-90 0 0"
-      width="24"
-      height="24"
-      color="#4FAD5B"
-      locomotion-collider="type: floor; size: 24 0 24"
+      width="180"
+      height="180"
+      color="#6FA946"
+      locomotion-collider="type: floor; size: 180 0 180"
     ></a-plane>
 
-    <a-box
-      position="0 1 -3"
-      width="1.8"
-      height="2"
-      depth="1.8"
-      color="#F28749"
-      locomotion-collider="type: box; size: 1.8 2 1.8"
-    ></a-box>
-
-    <a-box
-      position="-2.2 1.5 -5"
-      width="1.6"
-      height="3"
-      depth="1.6"
-      color="#E35D6A"
-      locomotion-collider="type: box; size: 1.6 3 1.6"
-    ></a-box>
-
-    <a-box
-      position="2.4 0.8 -4.5"
-      width="2.4"
-      height="1.6"
-      depth="1.6"
-      color="#6A7BFF"
-      locomotion-collider="type: box; size: 2.4 1.6 1.6"
-    ></a-box>
-
-    <a-box
-      position="0 1.25 -7"
-      width="6"
-      height="2.5"
-      depth="0.6"
-      color="#9A6CF0"
-      locomotion-collider="type: box; size: 6 2.5 0.6"
-    ></a-box>
-
-    <a-box
-      class="grabbable-object"
-      grabbable
-      position="-1 1.05 -2"
+    <a-plane
+      position="0 0.02 0"
+      rotation="-90 0 0"
+      width="8"
+      height="170"
+      color="#51545B"
+    ></a-plane>
+    <a-plane
+      position="0 0.025 0"
+      rotation="-90 0 0"
       width="0.28"
-      height="0.28"
-      depth="0.28"
-      color="#FFB347"
-    ></a-box>
+      height="150"
+      color="#F6D45C"
+    ></a-plane>
+    <a-plane
+      position="-4.7 0.03 0"
+      rotation="-90 0 0"
+      width="1.4"
+      height="170"
+      color="#CFC9B7"
+      opacity="0.55"
+    ></a-plane>
+    <a-plane
+      position="4.7 0.03 0"
+      rotation="-90 0 0"
+      width="1.4"
+      height="170"
+      color="#CFC9B7"
+      opacity="0.55"
+    ></a-plane>
 
-    <a-sphere
-      class="grabbable-object"
-      grabbable
-      position="1.15 1.15 -2.35"
-      radius="0.18"
-      color="#7FDBFF"
-    ></a-sphere>
-
-    <a-cylinder
-      class="grabbable-object"
-      grabbable
-      position="-2.3 1.05 -3.6"
-      radius="0.14"
-      height="0.42"
-      color="#F78FB3"
-    ></a-cylinder>
-
-    <a-box
-      class="grabbable-object"
-      grabbable
-      position="2.45 1.15 -3.2"
-      width="0.22"
-      height="0.42"
-      depth="0.22"
-      color="#9BFF9B"
-    ></a-box>
-
-    <a-plane position="0 2.8 -3" width="4.8" height="0.9" color="#FFFFFF">
-      <a-text
-        value="FEEBLE"
-        position="0 0 0.01"
-        color="#111111"
-        width="4.35"
-        align="center"
-      ></a-text>
-    </a-plane>
-
+    <a-entity id="world-root"></a-entity>
     <a-entity id="remote-players"></a-entity>
   </a-scene>
 </body>
