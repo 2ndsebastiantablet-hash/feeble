@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quest Gorilla Locomotion Prototype</title>
+  <title>Quest VR Prototype</title>
 
   <!-- A-Frame includes WebXR support and creates the Enter VR button automatically. -->
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
@@ -91,8 +91,8 @@
 </head>
 <body>
   <div id="note">
-    Open this page in Meta Quest Browser, press Enter VR, and push your hand spheres against the
-    floor or blocks to move. Thumbsticks, teleport, and keyboard movement are intentionally disabled.
+    Open this page in Meta Quest Browser, press Enter VR, use the left joystick to move, and press
+    the right A button to jump.
   </div>
   <div id="multiplayer-ui">
     <h2>Multiplayer</h2>
@@ -128,15 +128,15 @@
     <a-entity
       id="player-rig"
       position="0 0 4"
-      gorilla-locomotion="leftHand: #left-hand; rightHand: #right-hand; head: #player-camera; playerHeightOffset: 0.68"
+      simple-vr-locomotion="leftController: #left-hand; rightController: #right-hand; camera: #player-camera"
     >
       <a-camera id="player-camera" position="0 0 0" wasd-controls-enabled="false"></a-camera>
 
-      <a-entity id="left-hand" position="-0.35 -0.35 -0.4" tracked-controls="hand: left">
+      <a-entity id="left-hand" position="-0.25 1.2 -0.5" oculus-touch-controls="hand: left">
         <a-sphere id="left-hand-visual" radius="0.12" color="#FF7AA2" opacity="0.95"></a-sphere>
       </a-entity>
 
-      <a-entity id="right-hand" position="0.35 -0.35 -0.4" tracked-controls="hand: right">
+      <a-entity id="right-hand" position="0.25 1.2 -0.5" oculus-touch-controls="hand: right">
         <a-sphere id="right-hand-visual" radius="0.12" color="#6FC3FF" opacity="0.95"></a-sphere>
       </a-entity>
     </a-entity>
@@ -188,7 +188,7 @@
 
     <a-plane position="0 2.8 -3" width="4.8" height="0.9" color="#FFFFFF">
       <a-text
-        value="Quest Gorilla Locomotion Prototype"
+        value="Quest VR Prototype"
         position="0 0 0.01"
         color="#111111"
         width="4.35"
