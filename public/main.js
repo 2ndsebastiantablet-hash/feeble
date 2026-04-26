@@ -1,11 +1,6 @@
 import { MultiplayerClient } from "./frontend/multiplayer-client.js";
 
-const REMOTE_HEAD_RADIUS = 0.16;
-const REMOTE_HAND_RADIUS = 0.1;
-const REMOTE_BODY_HEIGHT = 0.55;
-const REMOTE_BODY_RADIUS = 0.12;
 const PLAYER_NAME_KEY = "feeble_player_name";
-const DEFAULT_LOBBY_NAME = "Feeble Room";
 const LOCAL_META = {
   headColor: "#F2F5FF",
   bodyColor: "#7A9BFF",
@@ -13,190 +8,23 @@ const LOCAL_META = {
   rightHandColor: "#6FC3FF"
 };
 
+const DAY_DURATION = 120;
+const NIGHT_DURATION = 720;
+const MAX_DAYS = 5;
+const HOUSE_BODY_COLOR = "#F6E8BF";
+const HOUSE_TRIM_COLOR = "#E3D6B0";
+const HOUSE_ROOF_COLOR = "#8A5A43";
+const HILL_COLOR = "#7BAF4B";
+const FENCE_COLOR = "#F6F7FB";
+
 const TEMP = {
+  rig: new THREE.Vector3(),
   head: new THREE.Vector3(),
   leftHand: new THREE.Vector3(),
-  rightHand: new THREE.Vector3(),
-  rig: new THREE.Vector3(),
-  world: new THREE.Vector3()
+  rightHand: new THREE.Vector3()
 };
 
 const avatarMap = new Map();
-
-AFRAME.registerComponent("menu-interactor", {
-  schema: {
-    defaultLength: { default: 4.5 },
-    triggerThreshold: { default: 0.7 },
-    buttonSelector: { default: ".vr-button" }
-  },
-
-  init: function () {
-    this.onTriggerDown = this.onTriggerDown.bind(this);
-    this.onMouseDown = this.onMouseDown.bind(this);
-    this.onInputEvent = this.onInputEvent.bind(this);
-    this.hoveredEl = null;
-    this.wasTriggerPressed = false;
-    this.lastSelectedId = "none";
-    this.lastInputEvent = "none";
-    this.raycaster = new THREE.Raycaster();
-    this.rayOrigin = new THREE.Vector3();
-    this.rayDirection = new THREE.Vector3();
-    this.worldQuaternion = new THREE.Quaternion();
-  },
-
-  play: function () {
-    this.el.addEventListener("triggerdown", this.onTriggerDown);
-    this.el.addEventListener("mousedown", this.onMouseDown);
-    this.el.addEventListener("triggerup", this.onInputEvent);
-    this.el.addEventListener("triggerchanged", this.onInputEvent);
-    this.el.addEventListener("buttondown", this.onInputEvent);
-    this.el.addEventListener("buttonup", this.onInputEvent);
-  },
-
-  pause: function () {
-    this.el.removeEventListener("triggerdown", this.onTriggerDown);
-    this.el.removeEventListener("mousedown", this.onMouseDown);
-    this.el.removeEventListener("triggerup", this.onInputEvent);
-    this.el.removeEventListener("triggerchanged", this.onInputEvent);
-    this.el.removeEventListener("buttondown", this.onInputEvent);
-    this.el.removeEventListener("buttonup", this.onInputEvent);
-  },
-
-  tick: function () {
-    const hit = this.getClosestButtonHit();
-    const nextHovered = hit ? hit.button : null;
-
-    if (nextHovered !== this.hoveredEl) {
-      if (this.hoveredEl) {
-        this.hoveredEl.emit("menu-hover-end");
-      }
-
-      this.hoveredEl = nextHovered;
-
-      if (this.hoveredEl) {
-        this.hoveredEl.emit("menu-hover-start");
-      }
-    }
-
-    const lineLength = hit ? hit.distance : this.data.defaultLength;
-    this.el.setAttribute("line", "end", "0 0 " + (-lineLength));
-
-    const triggerPressed = this.isTriggerPressed();
-
-    if (triggerPressed && !this.wasTriggerPressed) {
-      this.activateHoveredButton();
-    }
-
-    this.wasTriggerPressed = triggerPressed;
-    this.updateDebugText(hit, triggerPressed);
-  },
-
-  onTriggerDown: function () {
-    this.lastInputEvent = "triggerdown";
-    this.activateHoveredButton();
-  },
-
-  onMouseDown: function () {
-    this.lastInputEvent = "mousedown";
-    this.activateHoveredButton();
-  },
-
-  onInputEvent: function (event) {
-    this.lastInputEvent = event.type;
-  },
-
-  isTriggerPressed: function () {
-    const trackedControls = this.el.components["tracked-controls"];
-    const controller = trackedControls?.controller;
-    const gamepad = controller?.gamepad || controller;
-
-    if (!gamepad?.buttons?.length) {
-      return false;
-    }
-
-    const triggerButton = gamepad.buttons[0];
-
-    if (!triggerButton) {
-      return false;
-    }
-
-    return Boolean(triggerButton.pressed || triggerButton.value >= this.data.triggerThreshold);
-  },
-
-  activateHoveredButton: function () {
-    const hit = this.getClosestButtonHit();
-    const button = hit ? hit.button : this.hoveredEl;
-
-    if (!button) {
-      return;
-    }
-
-    this.lastSelectedId = button.id || button.getAttribute("id") || "unnamed";
-    button.emit("click");
-  },
-
-  getClosestButtonHit: function () {
-    const buttons = Array.from(document.querySelectorAll(this.data.buttonSelector));
-    const meshes = [];
-
-    if (!buttons.length) {
-      return null;
-    }
-
-    this.el.sceneEl.object3D.updateMatrixWorld(true);
-    this.el.object3D.getWorldPosition(this.rayOrigin);
-    this.el.object3D.getWorldQuaternion(this.worldQuaternion);
-    this.rayDirection.set(0, 0, -1).applyQuaternion(this.worldQuaternion).normalize();
-
-    this.raycaster.set(this.rayOrigin, this.rayDirection);
-    this.raycaster.far = this.data.defaultLength;
-
-    for (const button of buttons) {
-      const mesh = button.getObject3D("mesh");
-
-      if (!mesh) {
-        continue;
-      }
-
-      mesh.traverse(function (node) {
-        node.userData.buttonEl = button;
-        meshes.push(node);
-      });
-    }
-
-    const intersections = this.raycaster.intersectObjects(meshes, false);
-    const hit = intersections.find(function (intersection) {
-      return Boolean(findButtonFromObject(intersection.object));
-    });
-
-    if (!hit) {
-      return null;
-    }
-
-    return {
-      button: findButtonFromObject(hit.object),
-      distance: hit.distance
-    };
-  },
-
-  updateDebugText: function (hit, triggerPressed) {
-    const debugEl = document.getElementById("menu-debug-text");
-
-    if (!debugEl) {
-      return;
-    }
-
-    const hitId = hit?.button?.id || hit?.button?.getAttribute("id") || "none";
-    debugEl.setAttribute(
-      "value",
-      "Ray hit: " + Boolean(hit) +
-      "\nHit button: " + hitId +
-      "\nTrigger pressed: " + triggerPressed +
-      "\nLast input: " + this.lastInputEvent +
-      "\nLast selected: " + this.lastSelectedId
-    );
-  }
-});
 
 AFRAME.registerComponent("grabbable", {
   init: function () {
@@ -207,11 +35,13 @@ AFRAME.registerComponent("grabbable", {
 
 AFRAME.registerComponent("hand-grabber", {
   schema: {
-    radius: { default: 0.4 }
+    radius: { default: 0.45 }
   },
 
   init: function () {
     this.heldEl = null;
+    this.handWorld = new THREE.Vector3();
+    this.objectWorld = new THREE.Vector3();
     this.onGripDown = this.onGripDown.bind(this);
     this.onGripUp = this.onGripUp.bind(this);
   },
@@ -236,15 +66,15 @@ AFRAME.registerComponent("hand-grabber", {
     let closestDistance = this.data.radius;
 
     this.el.sceneEl.object3D.updateMatrixWorld(true);
-    this.el.object3D.getWorldPosition(TEMP.world);
+    this.el.object3D.getWorldPosition(this.handWorld);
 
     for (const candidate of candidates) {
       if (candidate.is("held")) {
         continue;
       }
 
-      candidate.object3D.getWorldPosition(TEMP.rig);
-      const distance = TEMP.world.distanceTo(TEMP.rig);
+      candidate.object3D.getWorldPosition(this.objectWorld);
+      const distance = this.handWorld.distanceTo(this.objectWorld);
 
       if (distance < closestDistance) {
         closestDistance = distance;
@@ -274,65 +104,156 @@ AFRAME.registerComponent("hand-grabber", {
   }
 });
 
+AFRAME.registerComponent("face-player", {
+  schema: {
+    target: { type: "selector" }
+  },
+
+  init: function () {
+    this.targetPosition = new THREE.Vector3();
+    this.selfPosition = new THREE.Vector3();
+  },
+
+  tick: function () {
+    const target = this.data.target;
+
+    if (!target) {
+      return;
+    }
+
+    target.object3D.getWorldPosition(this.targetPosition);
+    this.el.object3D.getWorldPosition(this.selfPosition);
+    this.el.object3D.lookAt(this.targetPosition);
+  }
+});
+
+AFRAME.registerComponent("day-night-cycle", {
+  schema: {
+    dayDuration: { default: DAY_DURATION },
+    nightDuration: { default: NIGHT_DURATION },
+    maxDays: { default: MAX_DAYS }
+  },
+
+  init: function () {
+    this.sceneEl = this.el.sceneEl;
+    this.skyEl = document.getElementById("sky");
+    this.sunEl = document.getElementById("sun");
+    this.moonEl = document.getElementById("moon");
+    this.phaseEl = document.getElementById("cycle-phase");
+    this.timerEl = document.getElementById("cycle-timer");
+    this.ambientEl = document.getElementById("ambient-light");
+    this.sunLightEl = document.getElementById("sun-light");
+    this.moonLightEl = document.getElementById("moon-light");
+  },
+
+  tick: function (timeMs) {
+    const cycleDuration = this.data.dayDuration + this.data.nightDuration;
+    const elapsedSeconds = timeMs / 1000;
+    const cycleIndex = Math.floor(elapsedSeconds / cycleDuration);
+    const secondsInCycle = elapsedSeconds % cycleDuration;
+    const currentDay = Math.min(cycleIndex + 1, this.data.maxDays);
+    const isDay = secondsInCycle < this.data.dayDuration;
+
+    if (isDay) {
+      const phaseProgress = secondsInCycle / this.data.dayDuration;
+      const timeRemaining = this.data.dayDuration - secondsInCycle;
+      this.renderDay(currentDay, phaseProgress, timeRemaining);
+      return;
+    }
+
+    const nightSeconds = secondsInCycle - this.data.dayDuration;
+    const phaseProgress = nightSeconds / this.data.nightDuration;
+    const timeRemaining = this.data.nightDuration - nightSeconds;
+    this.renderNight(currentDay, phaseProgress, timeRemaining);
+  },
+
+  renderDay: function (currentDay, phaseProgress, timeRemaining) {
+    const skyColor = lerpColor("#DDF1FF", "#85C5FF", Math.sin(phaseProgress * Math.PI));
+    const fogColor = lerpColor("#DDEED5", "#CDE4C1", phaseProgress);
+    const sunX = THREE.MathUtils.lerp(-75, 75, phaseProgress);
+    const sunY = 24 + Math.sin(phaseProgress * Math.PI) * 18;
+
+    this.sceneEl.setAttribute("fog", "type: linear; color: " + fogColor + "; near: 40; far: 120");
+    this.skyEl.setAttribute("color", skyColor);
+    this.sunEl.setAttribute("visible", "true");
+    this.moonEl.setAttribute("visible", "false");
+    this.sunEl.setAttribute("position", sunX + " " + sunY + " -80");
+    this.sunLightEl.setAttribute("light", {
+      type: "directional",
+      intensity: THREE.MathUtils.lerp(0.7, 1.15, Math.sin(phaseProgress * Math.PI)),
+      color: "#FFF2C4"
+    });
+    this.sunLightEl.setAttribute("position", sunX * 0.7 + " " + (sunY + 8) + " -55");
+    this.moonLightEl.setAttribute("light", { type: "directional", intensity: 0.08, color: "#8AA0FF" });
+    this.ambientEl.setAttribute("light", {
+      type: "ambient",
+      intensity: THREE.MathUtils.lerp(0.45, 0.72, Math.sin(phaseProgress * Math.PI)),
+      color: "#FFFFFF"
+    });
+    this.phaseEl.setAttribute("value", "DAY " + currentDay + " / " + this.data.maxDays + "   NIGHT IN");
+    this.timerEl.setAttribute("value", formatCountdown(timeRemaining));
+  },
+
+  renderNight: function (currentDay, phaseProgress, timeRemaining) {
+    const skyColor = lerpColor("#1E2A50", "#070B18", Math.sin(phaseProgress * Math.PI));
+    const fogColor = lerpColor("#33405F", "#1B2338", phaseProgress);
+    const moonX = THREE.MathUtils.lerp(75, -75, phaseProgress);
+    const moonY = 20 + Math.sin(phaseProgress * Math.PI) * 14;
+
+    this.sceneEl.setAttribute("fog", "type: linear; color: " + fogColor + "; near: 28; far: 95");
+    this.skyEl.setAttribute("color", skyColor);
+    this.sunEl.setAttribute("visible", "false");
+    this.moonEl.setAttribute("visible", "true");
+    this.moonEl.setAttribute("position", moonX + " " + moonY + " -80");
+    this.sunLightEl.setAttribute("light", { type: "directional", intensity: 0.05, color: "#6B7399" });
+    this.moonLightEl.setAttribute("light", {
+      type: "directional",
+      intensity: THREE.MathUtils.lerp(0.2, 0.34, Math.sin(phaseProgress * Math.PI)),
+      color: "#94A9FF"
+    });
+    this.moonLightEl.setAttribute("position", moonX * 0.7 + " " + (moonY + 8) + " -55");
+    this.ambientEl.setAttribute("light", {
+      type: "ambient",
+      intensity: THREE.MathUtils.lerp(0.14, 0.22, Math.sin(phaseProgress * Math.PI)),
+      color: "#A8B6FF"
+    });
+    this.phaseEl.setAttribute("value", "DAY " + currentDay + " / " + this.data.maxDays + "   SUNRISE IN");
+    this.timerEl.setAttribute("value", formatCountdown(timeRemaining));
+  }
+});
+
 window.addEventListener("DOMContentLoaded", function () {
   const scene = document.querySelector("a-scene");
   const note = document.getElementById("note");
-  const remotePlayersRoot = document.getElementById("remote-players");
   const rigEl = document.getElementById("player-rig");
   const headEl = document.getElementById("player-camera");
   const leftHandEl = document.getElementById("left-hand");
   const rightHandEl = document.getElementById("right-hand");
-  const mainMenuEl = document.getElementById("main-menu");
-  const multiplayerMenuEl = document.getElementById("multiplayer-menu");
-  const playButtonEl = document.getElementById("play-button");
-  const createPublicButtonEl = document.getElementById("create-public-button");
-  const createPrivateButtonEl = document.getElementById("create-private-button");
-  const refreshLobbiesButtonEl = document.getElementById("refresh-lobbies-button");
-  const leaveLobbyButtonEl = document.getElementById("leave-lobby-button");
-  const menuStatusTextEl = document.getElementById("menu-status-text");
-  const menuCodeTextEl = document.getElementById("menu-code-text");
-  const publicLobbiesPanelEl = document.getElementById("public-lobbies-panel");
+  const remotePlayersRoot = document.getElementById("remote-players");
+  const worldRoot = document.getElementById("world-root");
 
-  if (
-    !scene ||
-    !note ||
-    !remotePlayersRoot ||
-    !rigEl ||
-    !headEl ||
-    !leftHandEl ||
-    !rightHandEl ||
-    !mainMenuEl ||
-    !multiplayerMenuEl ||
-    !playButtonEl ||
-    !createPublicButtonEl ||
-    !createPrivateButtonEl ||
-    !refreshLobbiesButtonEl ||
-    !leaveLobbyButtonEl ||
-    !menuStatusTextEl ||
-    !menuCodeTextEl ||
-    !publicLobbiesPanelEl
-  ) {
+  if (!scene || !note || !rigEl || !headEl || !leftHandEl || !rightHandEl || !remotePlayersRoot || !worldRoot) {
     return;
   }
 
-  const defaultNote = note.textContent.trim();
-  const playerName = getOrCreatePlayerName();
+  buildNeighborhoodWorld(worldRoot);
+
+  note.textContent = "You spawn directly into the Neighborhood hub. Move with the left joystick, turn with the right joystick, jump with the right A button, and grab loose supplies with either grip button.";
+
   let client = null;
-  let hasStarted = false;
-  let currentPublicLobbies = [];
 
-  registerHoverButton(playButtonEl, "#235F9F", "#3A86D1");
-  registerHoverButton(createPublicButtonEl, "#2B7A78", "#389E9B");
-  registerHoverButton(createPrivateButtonEl, "#7A4BC2", "#9562E0");
-  registerHoverButton(refreshLobbiesButtonEl, "#235F9F", "#3A86D1");
-  registerHoverButton(leaveLobbyButtonEl, "#9E3D3D", "#C45656");
+  function ensureClient() {
+    if (client) {
+      return client;
+    }
 
-  function setStatus(text) {
-    menuStatusTextEl.setAttribute("value", text);
-  }
+    client = new MultiplayerClient(window.location.origin, {
+      storageKey: "feeble_multiplayer_session",
+      onSnapshot: renderSnapshot,
+      onError: function () {}
+    });
 
-  function setCodeText(text) {
-    menuCodeTextEl.setAttribute("value", text);
+    return client;
   }
 
   function buildLocalState() {
@@ -350,53 +271,12 @@ window.addEventListener("DOMContentLoaded", function () {
     };
   }
 
-  function ensureClient() {
-    const apiBase = window.location.origin;
-
-    if (client && client.apiBase === apiBase) {
-      return client;
-    }
-
-    if (client) {
-      client.disconnectSocket();
-    }
-
-    client = new MultiplayerClient(apiBase, {
-      storageKey: "feeble_multiplayer_session",
-      onSnapshot: renderSnapshot,
-      onOpen: function (snapshot) {
-        setStatus("Connected to " + snapshot.name + ".");
-      },
-      onClose: function () {
-        setStatus("Realtime connection closed.");
-      },
-      onError: function (error) {
-        setStatus(error.message);
-      }
-    });
-
-    return client;
-  }
-
-  function showMultiplayerMenu() {
-    hasStarted = true;
-    mainMenuEl.setAttribute("visible", "false");
-    multiplayerMenuEl.setAttribute("visible", "true");
-    note.textContent = "Move with the left joystick, turn with the right joystick, jump with the right A button, use the trigger on menu buttons, and grip objects to pick them up.";
-  }
-
   function renderSnapshot(snapshot) {
     clearMissingAvatars(snapshot);
 
     if (!snapshot) {
-      setStatus("Not in a lobby.");
-      setCodeText("Private code: none");
       return;
     }
-
-    const codeText = snapshot.code ? "Private code: " + snapshot.code : "Private code: none";
-    setStatus(snapshot.name + " | " + snapshot.playerCount + "/" + snapshot.maxPlayers);
-    setCodeText(codeText);
 
     const localPlayerId = snapshot.youPlayerId || null;
 
@@ -429,81 +309,6 @@ window.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  function renderPublicLobbies(lobbies) {
-    currentPublicLobbies = lobbies.slice(0, 4);
-
-    while (publicLobbiesPanelEl.firstChild) {
-      publicLobbiesPanelEl.removeChild(publicLobbiesPanelEl.firstChild);
-    }
-
-    if (!currentPublicLobbies.length) {
-      const emptyText = document.createElement("a-text");
-      emptyText.setAttribute("value", "No public lobbies found.");
-      emptyText.setAttribute("align", "center");
-      emptyText.setAttribute("color", "#DCEEFF");
-      emptyText.setAttribute("width", "2.7");
-      emptyText.setAttribute("wrap-count", "26");
-      publicLobbiesPanelEl.appendChild(emptyText);
-      return;
-    }
-
-    currentPublicLobbies.forEach(function (lobby, index) {
-      const y = -index * 0.28;
-      const button = createMenuButton({
-        id: "join-lobby-" + index,
-        color: "#3D5A80",
-        label: "Join " + trimLabel(lobby.name, 12) + " (" + lobby.playerCount + "/" + lobby.maxPlayers + ")",
-        position: "0 " + y + " 0.02",
-        width: 1.95,
-        height: 0.2,
-        textWidth: 2.7
-      });
-
-      registerHoverButton(button, "#3D5A80", "#5072A0");
-      button.addEventListener("click", function () {
-        joinPublicLobby(lobby.lobbyId).catch(function (error) {
-          setStatus(error.message);
-        });
-      });
-      publicLobbiesPanelEl.appendChild(button);
-    });
-  }
-
-  async function refreshPublicLobbies() {
-    const activeClient = ensureClient();
-    const lobbies = await activeClient.listPublicLobbies();
-    renderPublicLobbies(lobbies);
-  }
-
-  async function createLobby(privateLobby) {
-    const activeClient = ensureClient();
-    const code = privateLobby ? generatePrivateCode() : "";
-
-    await activeClient.createLobby({
-      playerName: playerName,
-      lobbyName: DEFAULT_LOBBY_NAME,
-      privateLobby: privateLobby,
-      code: code,
-      maxPlayers: 12,
-      playerState: buildLocalState(),
-      playerMeta: LOCAL_META
-    });
-
-    if (privateLobby) {
-      setCodeText("Private code: " + code);
-    }
-  }
-
-  async function joinPublicLobby(lobbyId) {
-    const activeClient = ensureClient();
-    await activeClient.joinLobbyById({
-      lobbyId: lobbyId,
-      playerName: playerName,
-      playerState: buildLocalState(),
-      playerMeta: LOCAL_META
-    });
-  }
-
   function stateLoop() {
     if (client?.snapshot) {
       client.pushState(buildLocalState(), LOCAL_META);
@@ -512,136 +317,325 @@ window.addEventListener("DOMContentLoaded", function () {
     requestAnimationFrame(stateLoop);
   }
 
-  playButtonEl.addEventListener("click", function () {
-    showMultiplayerMenu();
-    refreshPublicLobbies().catch(function (error) {
-      setStatus(error.message);
-    });
-  });
-
-  createPublicButtonEl.addEventListener("click", function () {
-    createLobby(false).catch(function (error) {
-      setStatus(error.message);
-    });
-  });
-
-  createPrivateButtonEl.addEventListener("click", function () {
-    createLobby(true).catch(function (error) {
-      setStatus(error.message);
-    });
-  });
-
-  refreshLobbiesButtonEl.addEventListener("click", function () {
-    refreshPublicLobbies().catch(function (error) {
-      setStatus(error.message);
-    });
-  });
-
-  leaveLobbyButtonEl.addEventListener("click", function () {
-    if (!client) {
-      return;
-    }
-
-    client.leave()
-      .then(function () {
-        clearMissingAvatars(null);
-        renderSnapshot(null);
-        refreshPublicLobbies().catch(function () {});
-      })
-      .catch(function (error) {
-        setStatus(error.message);
-      });
-  });
-
-  scene.addEventListener("enter-vr", function () {
-    if (!hasStarted) {
-      note.textContent = "Aim at the Play button with either controller and pull the trigger. After that, use the right-side VR menu for multiplayer.";
-      return;
-    }
-
-    note.textContent = "Move with the left joystick, turn with the right joystick, jump with the right A button, use the trigger on menu buttons, and grip objects to pick them up.";
-  });
-
-  scene.addEventListener("exit-vr", function () {
-    note.textContent = defaultNote;
-  });
-
-  const startupClient = ensureClient();
-  startupClient.restore().then(function (snapshot) {
+  ensureClient().restore().then(function (snapshot) {
     if (snapshot) {
       renderSnapshot(snapshot);
     }
   }).catch(function () {});
 
-  renderPublicLobbies([]);
   stateLoop();
 });
 
-function createMenuButton(options) {
-  const button = document.createElement("a-plane");
-  const text = document.createElement("a-text");
+function buildNeighborhoodWorld(root) {
+  const hillsRoot = document.createElement("a-entity");
+  const housesRoot = document.createElement("a-entity");
+  const fencesRoot = document.createElement("a-entity");
+  const propsRoot = document.createElement("a-entity");
+  const lootRoot = document.createElement("a-entity");
 
-  button.setAttribute("id", options.id);
-  button.setAttribute("class", "menu-hitbox vr-button");
-  button.setAttribute("position", options.position);
-  button.setAttribute("width", options.width);
-  button.setAttribute("height", options.height);
-  button.setAttribute("color", options.color);
+  root.appendChild(hillsRoot);
+  root.appendChild(housesRoot);
+  root.appendChild(fencesRoot);
+  root.appendChild(propsRoot);
+  root.appendChild(lootRoot);
 
-  text.setAttribute("value", options.label);
-  text.setAttribute("position", "0 0 0.01");
-  text.setAttribute("align", "center");
-  text.setAttribute("color", "#FFFFFF");
-  text.setAttribute("width", options.textWidth || 2.2);
-  text.setAttribute("wrap-count", "24");
+  const hillSpecs = [
+    { x: -26, y: -7, z: -18, scale: "1.5 0.45 1.35" },
+    { x: -12, y: -6.3, z: -26, scale: "1.2 0.4 1.15" },
+    { x: 8, y: -7.2, z: -22, scale: "1.45 0.48 1.25" },
+    { x: 22, y: -7, z: -14, scale: "1.35 0.44 1.3" },
+    { x: -30, y: -7, z: 16, scale: "1.4 0.44 1.25" },
+    { x: -12, y: -6.5, z: 20, scale: "1.15 0.38 1.1" },
+    { x: 12, y: -7.2, z: 18, scale: "1.55 0.48 1.25" },
+    { x: 30, y: -6.8, z: 12, scale: "1.25 0.42 1.1" },
+    { x: -44, y: -8, z: -8, scale: "1.9 0.5 1.4" },
+    { x: 45, y: -8, z: -4, scale: "1.8 0.5 1.35" },
+    { x: -42, y: -8, z: 24, scale: "1.8 0.5 1.35" },
+    { x: 42, y: -8, z: 26, scale: "1.9 0.52 1.4" }
+  ];
 
-  button.appendChild(text);
-  return button;
-}
-
-function registerHoverButton(buttonEl, baseColor, hoverColor) {
-  buttonEl.setAttribute("color", baseColor);
-  buttonEl.addEventListener("menu-hover-start", function () {
-    buttonEl.setAttribute("color", hoverColor);
-  });
-  buttonEl.addEventListener("menu-hover-end", function () {
-    buttonEl.setAttribute("color", baseColor);
-  });
-}
-
-function findMenuButton(startEl) {
-  let el = startEl;
-
-  while (el) {
-    if (el.classList && el.classList.contains("menu-hitbox")) {
-      return el;
-    }
-
-    el = el.parentEl;
+  for (const hill of hillSpecs) {
+    const hillEl = document.createElement("a-sphere");
+    hillEl.setAttribute("radius", "18");
+    hillEl.setAttribute("position", hill.x + " " + hill.y + " " + hill.z);
+    hillEl.setAttribute("scale", hill.scale);
+    hillEl.setAttribute("color", HILL_COLOR);
+    hillEl.setAttribute("shader", "flat");
+    hillsRoot.appendChild(hillEl);
   }
 
-  return null;
-}
+  const houseSpecs = [
+    { x: -18, y: 3.6, z: -12, scale: 1.1, rotation: -8 },
+    { x: -4, y: 1.8, z: -28, scale: 0.85, rotation: 10 },
+    { x: 14, y: 3.6, z: -18, scale: 1.2, rotation: -5 },
+    { x: 26, y: 2.8, z: -7, scale: 0.9, rotation: 12 },
+    { x: -24, y: 3.4, z: 18, scale: 0.95, rotation: 7 },
+    { x: -6, y: 2.4, z: 24, scale: 0.82, rotation: -12 },
+    { x: 18, y: 3.7, z: 16, scale: 1.05, rotation: -9 },
+    { x: 34, y: 2.8, z: 10, scale: 0.88, rotation: 6 },
+    { x: -39, y: 4.4, z: -6, scale: 1.1, rotation: 10 },
+    { x: 41, y: 4.3, z: 1, scale: 1.08, rotation: -6 }
+  ];
 
-function findButtonFromObject(object3D) {
-  let current = object3D;
-
-  while (current) {
-    if (current.userData?.buttonEl) {
-      return current.userData.buttonEl;
-    }
-
-    current = current.parent;
+  for (const house of houseSpecs) {
+    housesRoot.appendChild(createHouse(house));
   }
 
-  return null;
+  createFenceLine(fencesRoot, { xStart: -62, xEnd: 62, z: -5.2 });
+  createFenceLine(fencesRoot, { xStart: -62, xEnd: 62, z: 5.2 });
+  createFenceCurve(fencesRoot, { xStart: -30, xEnd: -4, z: -20, y: 0.8 });
+  createFenceCurve(fencesRoot, { xStart: 8, xEnd: 34, z: 18, y: 1.1 });
+
+  propsRoot.appendChild(createWaterTower(-32, 9.5, -24, 1.15));
+  propsRoot.appendChild(createRoadSign(10, 1.1, 13, -15));
+  propsRoot.appendChild(createRoadSign(-9, 1.1, -14, 14));
+
+  const lootSpecs = [
+    { x: -2.4, y: 0.55, z: -8, color: "#FFD36A", shape: "box" },
+    { x: 3.1, y: 0.62, z: 11.4, color: "#90E0FF", shape: "sphere" },
+    { x: -14.6, y: 1.1, z: -10.5, color: "#FF9BC3", shape: "cylinder" },
+    { x: 15.6, y: 0.95, z: 15.8, color: "#B4FF9D", shape: "box" },
+    { x: -23.5, y: 0.8, z: 17.4, color: "#E9C5FF", shape: "sphere" },
+    { x: 26.8, y: 0.8, z: -6.4, color: "#FFE68E", shape: "cylinder" }
+  ];
+
+  for (const loot of lootSpecs) {
+    lootRoot.appendChild(createLootProp(loot));
+  }
+}
+
+function createHouse(options) {
+  const root = document.createElement("a-entity");
+  const body = document.createElement("a-box");
+  const roof = document.createElement("a-cone");
+  const door = document.createElement("a-plane");
+  const trimLeft = document.createElement("a-box");
+  const trimRight = document.createElement("a-box");
+  const trimCenter = document.createElement("a-box");
+
+  const scale = options.scale || 1;
+
+  root.setAttribute("position", options.x + " " + options.y + " " + options.z);
+  root.setAttribute("rotation", "0 " + (options.rotation || 0) + " 0");
+  root.setAttribute("scale", scale + " " + scale + " " + scale);
+
+  body.setAttribute("width", "3.2");
+  body.setAttribute("height", "4.9");
+  body.setAttribute("depth", "3");
+  body.setAttribute("color", HOUSE_BODY_COLOR);
+  body.setAttribute("position", "0 2.45 0");
+
+  roof.setAttribute("radius-bottom", "2.55");
+  roof.setAttribute("radius-top", "0.2");
+  roof.setAttribute("height", "2.4");
+  roof.setAttribute("segments-radial", "4");
+  roof.setAttribute("rotation", "45 45 0");
+  roof.setAttribute("position", "0 6 0");
+  roof.setAttribute("color", HOUSE_ROOF_COLOR);
+
+  door.setAttribute("width", "0.8");
+  door.setAttribute("height", "1.55");
+  door.setAttribute("position", "0 0.92 1.51");
+  door.setAttribute("color", "#B28A68");
+
+  trimLeft.setAttribute("width", "0.12");
+  trimLeft.setAttribute("height", "4.95");
+  trimLeft.setAttribute("depth", "3.05");
+  trimLeft.setAttribute("position", "-1.57 2.48 0");
+  trimLeft.setAttribute("color", HOUSE_TRIM_COLOR);
+
+  trimRight.setAttribute("width", "0.12");
+  trimRight.setAttribute("height", "4.95");
+  trimRight.setAttribute("depth", "3.05");
+  trimRight.setAttribute("position", "1.57 2.48 0");
+  trimRight.setAttribute("color", HOUSE_TRIM_COLOR);
+
+  trimCenter.setAttribute("width", "0.12");
+  trimCenter.setAttribute("height", "4.95");
+  trimCenter.setAttribute("depth", "3.05");
+  trimCenter.setAttribute("position", "0 2.48 0");
+  trimCenter.setAttribute("color", HOUSE_TRIM_COLOR);
+
+  root.appendChild(body);
+  root.appendChild(roof);
+  root.appendChild(door);
+  root.appendChild(trimLeft);
+  root.appendChild(trimRight);
+  root.appendChild(trimCenter);
+
+  addHouseWindows(root);
+  return root;
+}
+
+function addHouseWindows(root) {
+  const rows = [
+    { y: 3.85, xs: [-0.8, 0.8] },
+    { y: 2.45, xs: [-0.8, 0.8] },
+    { y: 1.08, xs: [-0.8, 0.8] }
+  ];
+
+  for (const row of rows) {
+    for (const x of row.xs) {
+      const frame = document.createElement("a-plane");
+      const windowPane = document.createElement("a-plane");
+
+      frame.setAttribute("width", "0.54");
+      frame.setAttribute("height", "0.84");
+      frame.setAttribute("position", x + " " + row.y + " 1.515");
+      frame.setAttribute("color", "#F7F8F8");
+
+      windowPane.setAttribute("width", "0.42");
+      windowPane.setAttribute("height", "0.72");
+      windowPane.setAttribute("position", x + " " + row.y + " 1.525");
+      windowPane.setAttribute("color", "#1B2027");
+
+      root.appendChild(frame);
+      root.appendChild(windowPane);
+    }
+  }
+}
+
+function createFenceLine(root, options) {
+  for (let x = options.xStart; x <= options.xEnd; x += 1.6) {
+    const post = document.createElement("a-box");
+    post.setAttribute("width", "0.16");
+    post.setAttribute("height", "1.15");
+    post.setAttribute("depth", "0.16");
+    post.setAttribute("position", x + " 0.58 " + options.z);
+    post.setAttribute("color", FENCE_COLOR);
+    root.appendChild(post);
+  }
+
+  const railTop = document.createElement("a-box");
+  railTop.setAttribute("width", options.xEnd - options.xStart + 0.8);
+  railTop.setAttribute("height", "0.08");
+  railTop.setAttribute("depth", "0.08");
+  railTop.setAttribute("position", ((options.xStart + options.xEnd) / 2) + " 0.82 " + options.z);
+  railTop.setAttribute("color", FENCE_COLOR);
+
+  const railBottom = document.createElement("a-box");
+  railBottom.setAttribute("width", options.xEnd - options.xStart + 0.8);
+  railBottom.setAttribute("height", "0.08");
+  railBottom.setAttribute("depth", "0.08");
+  railBottom.setAttribute("position", ((options.xStart + options.xEnd) / 2) + " 0.45 " + options.z);
+  railBottom.setAttribute("color", FENCE_COLOR);
+
+  root.appendChild(railTop);
+  root.appendChild(railBottom);
+}
+
+function createFenceCurve(root, options) {
+  for (let x = options.xStart; x <= options.xEnd; x += 1.4) {
+    const post = document.createElement("a-box");
+    const y = options.y + Math.sin((x - options.xStart) * 0.18) * 0.35;
+    post.setAttribute("width", "0.16");
+    post.setAttribute("height", "1.1");
+    post.setAttribute("depth", "0.16");
+    post.setAttribute("position", x + " " + y + " " + options.z);
+    post.setAttribute("color", FENCE_COLOR);
+    root.appendChild(post);
+  }
+}
+
+function createWaterTower(x, y, z, scale) {
+  const root = document.createElement("a-entity");
+  const tank = document.createElement("a-cylinder");
+  const cap = document.createElement("a-sphere");
+
+  root.setAttribute("position", x + " " + y + " " + z);
+  root.setAttribute("scale", scale + " " + scale + " " + scale);
+
+  tank.setAttribute("radius", "1.25");
+  tank.setAttribute("height", "2.8");
+  tank.setAttribute("color", "#E7E5D8");
+  tank.setAttribute("position", "0 5.8 0");
+
+  cap.setAttribute("radius", "1.28");
+  cap.setAttribute("scale", "1 0.5 1");
+  cap.setAttribute("color", "#EFEDE1");
+  cap.setAttribute("position", "0 7.05 0");
+
+  root.appendChild(tank);
+  root.appendChild(cap);
+
+  const legPositions = [
+    [-0.9, 2.7, -0.9],
+    [0.9, 2.7, -0.9],
+    [-0.9, 2.7, 0.9],
+    [0.9, 2.7, 0.9]
+  ];
+
+  for (const leg of legPositions) {
+    const legEl = document.createElement("a-cylinder");
+    legEl.setAttribute("radius", "0.1");
+    legEl.setAttribute("height", "5.4");
+    legEl.setAttribute("color", "#D9D7CA");
+    legEl.setAttribute("position", leg[0] + " " + leg[1] + " " + leg[2]);
+    root.appendChild(legEl);
+  }
+
+  return root;
+}
+
+function createRoadSign(x, y, z, rotationY) {
+  const root = document.createElement("a-entity");
+  const pole = document.createElement("a-cylinder");
+  const sign = document.createElement("a-circle");
+  const arrow = document.createElement("a-text");
+
+  root.setAttribute("position", x + " " + y + " " + z);
+  root.setAttribute("rotation", "0 " + rotationY + " 0");
+
+  pole.setAttribute("radius", "0.05");
+  pole.setAttribute("height", "1.8");
+  pole.setAttribute("color", "#C6CDD4");
+  pole.setAttribute("position", "0 0.9 0");
+
+  sign.setAttribute("radius", "0.34");
+  sign.setAttribute("color", "#FFFFFF");
+  sign.setAttribute("position", "0 1.75 0");
+
+  arrow.setAttribute("value", ">");
+  arrow.setAttribute("color", "#2D5B9F");
+  arrow.setAttribute("width", "2.5");
+  arrow.setAttribute("align", "center");
+  arrow.setAttribute("position", "0 1.74 0.02");
+
+  root.appendChild(pole);
+  root.appendChild(sign);
+  root.appendChild(arrow);
+  return root;
+}
+
+function createLootProp(options) {
+  let el;
+
+  if (options.shape === "sphere") {
+    el = document.createElement("a-sphere");
+    el.setAttribute("radius", "0.18");
+  } else if (options.shape === "cylinder") {
+    el = document.createElement("a-cylinder");
+    el.setAttribute("radius", "0.12");
+    el.setAttribute("height", "0.36");
+  } else {
+    el = document.createElement("a-box");
+    el.setAttribute("width", "0.26");
+    el.setAttribute("height", "0.2");
+    el.setAttribute("depth", "0.34");
+  }
+
+  el.setAttribute("class", "grabbable-object");
+  el.setAttribute("grabbable", "");
+  el.setAttribute("position", options.x + " " + options.y + " " + options.z);
+  el.setAttribute("color", options.color);
+  return el;
 }
 
 function updateGrabTint(event) {
   const el = event.target;
 
   if (el.is("held")) {
-    el.setAttribute("opacity", "0.8");
+    el.setAttribute("opacity", "0.82");
     return;
   }
 
@@ -667,41 +661,41 @@ function getOrCreateAvatar(playerId, root) {
   const rightLeg = document.createElement("a-cylinder");
   const label = document.createElement("a-text");
 
-  head.setAttribute("radius", REMOTE_HEAD_RADIUS);
+  head.setAttribute("radius", "0.16");
   head.setAttribute("color", "#F2F5FF");
 
-  visor.setAttribute("radius", 0.11);
+  visor.setAttribute("radius", "0.11");
   visor.setAttribute("scale", "1.15 0.65 0.7");
   visor.setAttribute("color", "#12243A");
   visor.setAttribute("opacity", "0.96");
 
-  torso.setAttribute("width", 0.34);
-  torso.setAttribute("height", 0.42);
-  torso.setAttribute("depth", 0.2);
+  torso.setAttribute("width", "0.34");
+  torso.setAttribute("height", "0.42");
+  torso.setAttribute("depth", "0.2");
   torso.setAttribute("color", "#7A9BFF");
 
-  chest.setAttribute("width", 0.26);
-  chest.setAttribute("height", 0.18);
-  chest.setAttribute("depth", 0.22);
+  chest.setAttribute("width", "0.26");
+  chest.setAttribute("height", "0.18");
+  chest.setAttribute("depth", "0.22");
   chest.setAttribute("color", "#CFE1FF");
 
-  hips.setAttribute("width", 0.28);
-  hips.setAttribute("height", 0.12);
-  hips.setAttribute("depth", 0.18);
+  hips.setAttribute("width", "0.28");
+  hips.setAttribute("height", "0.12");
+  hips.setAttribute("depth", "0.18");
   hips.setAttribute("color", "#4C6797");
 
-  leftHand.setAttribute("radius", REMOTE_HAND_RADIUS);
+  leftHand.setAttribute("radius", "0.1");
   leftHand.setAttribute("color", "#FF7AA2");
 
-  rightHand.setAttribute("radius", REMOTE_HAND_RADIUS);
+  rightHand.setAttribute("radius", "0.1");
   rightHand.setAttribute("color", "#6FC3FF");
 
-  leftLeg.setAttribute("radius", 0.06);
-  leftLeg.setAttribute("height", 0.32);
+  leftLeg.setAttribute("radius", "0.06");
+  leftLeg.setAttribute("height", "0.32");
   leftLeg.setAttribute("color", "#2F4C7A");
 
-  rightLeg.setAttribute("radius", 0.06);
-  rightLeg.setAttribute("height", 0.32);
+  rightLeg.setAttribute("radius", "0.06");
+  rightLeg.setAttribute("height", "0.32");
   rightLeg.setAttribute("color", "#2F4C7A");
 
   label.setAttribute("align", "center");
@@ -734,6 +728,7 @@ function getOrCreateAvatar(playerId, root) {
     rightLeg,
     label
   };
+
   avatarMap.set(playerId, avatar);
   return avatar;
 }
@@ -838,14 +833,16 @@ function getOrCreatePlayerName() {
   return generated;
 }
 
-function generatePrivateCode() {
-  return Math.random().toString(36).slice(2, 6).toUpperCase();
+function formatCountdown(secondsRemaining) {
+  const totalSeconds = Math.max(0, Math.ceil(secondsRemaining));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
 }
 
-function trimLabel(text, maxLength) {
-  if (text.length <= maxLength) {
-    return text;
-  }
-
-  return text.slice(0, maxLength - 3) + "...";
+function lerpColor(startHex, endHex, amount) {
+  const start = new THREE.Color(startHex);
+  const end = new THREE.Color(endHex);
+  start.lerp(end, THREE.MathUtils.clamp(amount, 0, 1));
+  return "#" + start.getHexString();
 }
