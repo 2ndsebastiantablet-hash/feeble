@@ -258,7 +258,7 @@ window.addEventListener("DOMContentLoaded", function () {
   });
 
   scene.addEventListener("enter-vr", function () {
-    note.textContent = "Press Enter VR, then push with your hands. Multiplayer avatars sync through the Cloudflare Worker URL in the panel.";
+    note.textContent = "Press Enter VR, use the left joystick to move, and press the right A button to jump. Multiplayer avatars sync through the Cloudflare Worker URL in the panel.";
   });
 
   scene.addEventListener("exit-vr", function () {
