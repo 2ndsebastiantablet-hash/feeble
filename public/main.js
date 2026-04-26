@@ -523,17 +523,38 @@ function getOrCreateAvatar(playerId, root) {
 
   const avatarRoot = document.createElement("a-entity");
   const head = document.createElement("a-sphere");
-  const body = document.createElement("a-cylinder");
+  const visor = document.createElement("a-sphere");
+  const torso = document.createElement("a-box");
+  const chest = document.createElement("a-box");
+  const hips = document.createElement("a-box");
   const leftHand = document.createElement("a-sphere");
   const rightHand = document.createElement("a-sphere");
+  const leftLeg = document.createElement("a-cylinder");
+  const rightLeg = document.createElement("a-cylinder");
   const label = document.createElement("a-text");
 
   head.setAttribute("radius", REMOTE_HEAD_RADIUS);
   head.setAttribute("color", "#F2F5FF");
 
-  body.setAttribute("radius", REMOTE_BODY_RADIUS);
-  body.setAttribute("height", REMOTE_BODY_HEIGHT);
-  body.setAttribute("color", "#7A9BFF");
+  visor.setAttribute("radius", 0.11);
+  visor.setAttribute("scale", "1.15 0.65 0.7");
+  visor.setAttribute("color", "#12243A");
+  visor.setAttribute("opacity", "0.96");
+
+  torso.setAttribute("width", 0.34);
+  torso.setAttribute("height", 0.42);
+  torso.setAttribute("depth", 0.2);
+  torso.setAttribute("color", "#7A9BFF");
+
+  chest.setAttribute("width", 0.26);
+  chest.setAttribute("height", 0.18);
+  chest.setAttribute("depth", 0.22);
+  chest.setAttribute("color", "#CFE1FF");
+
+  hips.setAttribute("width", 0.28);
+  hips.setAttribute("height", 0.12);
+  hips.setAttribute("depth", 0.18);
+  hips.setAttribute("color", "#4C6797");
 
   leftHand.setAttribute("radius", REMOTE_HAND_RADIUS);
   leftHand.setAttribute("color", "#FF7AA2");
@@ -541,19 +562,44 @@ function getOrCreateAvatar(playerId, root) {
   rightHand.setAttribute("radius", REMOTE_HAND_RADIUS);
   rightHand.setAttribute("color", "#6FC3FF");
 
+  leftLeg.setAttribute("radius", 0.06);
+  leftLeg.setAttribute("height", 0.32);
+  leftLeg.setAttribute("color", "#2F4C7A");
+
+  rightLeg.setAttribute("radius", 0.06);
+  rightLeg.setAttribute("height", 0.32);
+  rightLeg.setAttribute("color", "#2F4C7A");
+
   label.setAttribute("align", "center");
   label.setAttribute("color", "#111111");
   label.setAttribute("width", "3.4");
   label.setAttribute("side", "double");
 
   avatarRoot.appendChild(head);
-  avatarRoot.appendChild(body);
+  avatarRoot.appendChild(visor);
+  avatarRoot.appendChild(torso);
+  avatarRoot.appendChild(chest);
+  avatarRoot.appendChild(hips);
   avatarRoot.appendChild(leftHand);
   avatarRoot.appendChild(rightHand);
+  avatarRoot.appendChild(leftLeg);
+  avatarRoot.appendChild(rightLeg);
   avatarRoot.appendChild(label);
   root.appendChild(avatarRoot);
 
-  const avatar = { root: avatarRoot, head, body, leftHand, rightHand, label };
+  const avatar = {
+    root: avatarRoot,
+    head,
+    visor,
+    torso,
+    chest,
+    hips,
+    leftHand,
+    rightHand,
+    leftLeg,
+    rightLeg,
+    label
+  };
   avatarMap.set(playerId, avatar);
   return avatar;
 }
@@ -566,13 +612,38 @@ function updateAvatar(avatar, player) {
   const rightHand = normalizePosition(state.rightHand || state.head || state.rig);
 
   avatar.head.setAttribute("position", toPositionString(head));
-  avatar.body.setAttribute("position", toPositionString({
+  avatar.visor.setAttribute("position", toPositionString({
     x: head.x,
-    y: head.y - 0.42,
+    y: head.y - 0.01,
+    z: head.z + 0.085
+  }));
+  avatar.torso.setAttribute("position", toPositionString({
+    x: head.x,
+    y: head.y - 0.39,
+    z: head.z
+  }));
+  avatar.chest.setAttribute("position", toPositionString({
+    x: head.x,
+    y: head.y - 0.34,
+    z: head.z + 0.03
+  }));
+  avatar.hips.setAttribute("position", toPositionString({
+    x: head.x,
+    y: head.y - 0.64,
     z: head.z
   }));
   avatar.leftHand.setAttribute("position", toPositionString(leftHand));
   avatar.rightHand.setAttribute("position", toPositionString(rightHand));
+  avatar.leftLeg.setAttribute("position", toPositionString({
+    x: head.x - 0.08,
+    y: head.y - 0.86,
+    z: head.z
+  }));
+  avatar.rightLeg.setAttribute("position", toPositionString({
+    x: head.x + 0.08,
+    y: head.y - 0.86,
+    z: head.z
+  }));
   avatar.label.setAttribute("value", player.name + (player.isHost ? " (Host)" : ""));
   avatar.label.setAttribute("position", toPositionString({
     x: head.x,
@@ -585,7 +656,7 @@ function updateAvatar(avatar, player) {
   }
 
   if (meta.bodyColor) {
-    avatar.body.setAttribute("color", meta.bodyColor);
+    avatar.torso.setAttribute("color", meta.bodyColor);
   }
 
   if (meta.leftHandColor) {
