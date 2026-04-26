@@ -15,6 +15,7 @@ const HOUSE_BODY_COLOR = "#F6E8BF";
 const HOUSE_TRIM_COLOR = "#E3D6B0";
 const HOUSE_ROOF_COLOR = "#8A5A43";
 const HILL_COLOR = "#7BAF4B";
+const HILL_SHADOW_COLOR = "#5E923B";
 const FENCE_COLOR = "#F6F7FB";
 
 const TEMP = {
@@ -328,65 +329,90 @@ window.addEventListener("DOMContentLoaded", function () {
 
 function buildNeighborhoodWorld(root) {
   const hillsRoot = document.createElement("a-entity");
+  const distantHousesRoot = document.createElement("a-entity");
   const housesRoot = document.createElement("a-entity");
   const fencesRoot = document.createElement("a-entity");
   const propsRoot = document.createElement("a-entity");
   const lootRoot = document.createElement("a-entity");
 
   root.appendChild(hillsRoot);
+  root.appendChild(distantHousesRoot);
   root.appendChild(housesRoot);
   root.appendChild(fencesRoot);
   root.appendChild(propsRoot);
   root.appendChild(lootRoot);
 
   const hillSpecs = [
-    { x: -26, y: -7, z: -18, scale: "1.5 0.45 1.35" },
-    { x: -12, y: -6.3, z: -26, scale: "1.2 0.4 1.15" },
-    { x: 8, y: -7.2, z: -22, scale: "1.45 0.48 1.25" },
-    { x: 22, y: -7, z: -14, scale: "1.35 0.44 1.3" },
-    { x: -30, y: -7, z: 16, scale: "1.4 0.44 1.25" },
-    { x: -12, y: -6.5, z: 20, scale: "1.15 0.38 1.1" },
-    { x: 12, y: -7.2, z: 18, scale: "1.55 0.48 1.25" },
-    { x: 30, y: -6.8, z: 12, scale: "1.25 0.42 1.1" },
-    { x: -44, y: -8, z: -8, scale: "1.9 0.5 1.4" },
-    { x: 45, y: -8, z: -4, scale: "1.8 0.5 1.35" },
-    { x: -42, y: -8, z: 24, scale: "1.8 0.5 1.35" },
-    { x: 42, y: -8, z: 26, scale: "1.9 0.52 1.4" }
+    { x: -50, y: -10.8, z: -52, radius: 28, scale: "1.8 0.56 1.35" },
+    { x: -24, y: -9.8, z: -50, radius: 27, scale: "1.55 0.55 1.25" },
+    { x: 5, y: -10.2, z: -54, radius: 30, scale: "1.65 0.58 1.3" },
+    { x: 34, y: -10.6, z: -48, radius: 28, scale: "1.55 0.57 1.25" },
+    { x: 58, y: -11, z: -42, radius: 26, scale: "1.7 0.58 1.25" },
+    { x: -44, y: -9.8, z: -20, radius: 26, scale: "1.5 0.52 1.2" },
+    { x: -20, y: -8.4, z: -24, radius: 23, scale: "1.35 0.48 1.08" },
+    { x: 18, y: -8.8, z: -22, radius: 24, scale: "1.42 0.5 1.12" },
+    { x: 46, y: -9.5, z: -18, radius: 25, scale: "1.45 0.51 1.15" },
+    { x: -54, y: -10.6, z: 40, radius: 28, scale: "1.72 0.56 1.28" },
+    { x: -22, y: -9.8, z: 44, radius: 27, scale: "1.55 0.54 1.22" },
+    { x: 8, y: -10.2, z: 47, radius: 30, scale: "1.7 0.58 1.3" },
+    { x: 38, y: -10.4, z: 43, radius: 27, scale: "1.5 0.55 1.18" },
+    { x: 62, y: -11.1, z: 34, radius: 28, scale: "1.75 0.58 1.28" },
+    { x: -60, y: -13.5, z: 4, radius: 34, scale: "1.45 0.5 1.12", color: HILL_SHADOW_COLOR },
+    { x: 61, y: -13.4, z: 6, radius: 34, scale: "1.45 0.5 1.12", color: HILL_SHADOW_COLOR }
   ];
 
   for (const hill of hillSpecs) {
-    const hillEl = document.createElement("a-sphere");
-    hillEl.setAttribute("radius", "18");
-    hillEl.setAttribute("position", hill.x + " " + hill.y + " " + hill.z);
-    hillEl.setAttribute("scale", hill.scale);
-    hillEl.setAttribute("color", HILL_COLOR);
-    hillEl.setAttribute("shader", "flat");
-    hillsRoot.appendChild(hillEl);
+    hillsRoot.appendChild(createHill(hill));
   }
 
   const houseSpecs = [
-    { x: -18, y: 3.6, z: -12, scale: 1.1, rotation: -8 },
-    { x: -4, y: 1.8, z: -28, scale: 0.85, rotation: 10 },
-    { x: 14, y: 3.6, z: -18, scale: 1.2, rotation: -5 },
-    { x: 26, y: 2.8, z: -7, scale: 0.9, rotation: 12 },
-    { x: -24, y: 3.4, z: 18, scale: 0.95, rotation: 7 },
-    { x: -6, y: 2.4, z: 24, scale: 0.82, rotation: -12 },
-    { x: 18, y: 3.7, z: 16, scale: 1.05, rotation: -9 },
-    { x: 34, y: 2.8, z: 10, scale: 0.88, rotation: 6 },
-    { x: -39, y: 4.4, z: -6, scale: 1.1, rotation: 10 },
-    { x: 41, y: 4.3, z: 1, scale: 1.08, rotation: -6 }
+    { x: -18, y: 0.04, z: -14, scale: 1.18, rotation: -8 },
+    { x: -8.5, y: 0.04, z: -30, scale: 0.82, rotation: 10 },
+    { x: 14, y: 0.04, z: -18, scale: 1.24, rotation: -5 },
+    { x: 28, y: 0.04, z: -8, scale: 0.92, rotation: 12 },
+    { x: -25, y: 0.04, z: 17, scale: 1.02, rotation: 7 },
+    { x: -8, y: 0.04, z: 27, scale: 0.84, rotation: -12 },
+    { x: 18, y: 0.04, z: 17, scale: 1.1, rotation: -9 },
+    { x: 35, y: 0.04, z: 10, scale: 0.9, rotation: 6 },
+    { x: -41, y: 0.04, z: -7, scale: 1.12, rotation: 10 },
+    { x: 43, y: 0.04, z: 2, scale: 1.08, rotation: -6 },
+    { x: -35, y: 0.04, z: -31, scale: 0.74, rotation: 14 },
+    { x: 38, y: 0.04, z: -33, scale: 0.72, rotation: -11 },
+    { x: -38, y: 0.04, z: 35, scale: 0.78, rotation: -9 },
+    { x: 31, y: 0.04, z: 37, scale: 0.82, rotation: 8 }
   ];
 
   for (const house of houseSpecs) {
     housesRoot.appendChild(createHouse(house));
   }
 
+  const distantHouseSpecs = [
+    { x: -54, y: 1.08, z: -43, scale: 0.52, rotation: 10 },
+    { x: -36, y: 1.2, z: -47, scale: 0.46, rotation: -6 },
+    { x: -12, y: 0.94, z: -50, scale: 0.42, rotation: 8 },
+    { x: 9, y: 1.08, z: -49, scale: 0.48, rotation: -10 },
+    { x: 31, y: 1.2, z: -45, scale: 0.5, rotation: 8 },
+    { x: 52, y: 1.08, z: -38, scale: 0.46, rotation: -12 },
+    { x: -50, y: 1.18, z: 37, scale: 0.48, rotation: -10 },
+    { x: -27, y: 1.05, z: 43, scale: 0.42, rotation: 7 },
+    { x: -3, y: 1.1, z: 46, scale: 0.5, rotation: -6 },
+    { x: 23, y: 1.15, z: 43, scale: 0.46, rotation: 12 },
+    { x: 49, y: 1.18, z: 34, scale: 0.5, rotation: -8 }
+  ];
+
+  for (const house of distantHouseSpecs) {
+    distantHousesRoot.appendChild(createHouse(house));
+  }
+
   createFenceLine(fencesRoot, { xStart: -62, xEnd: 62, z: -5.2 });
   createFenceLine(fencesRoot, { xStart: -62, xEnd: 62, z: 5.2 });
-  createFenceCurve(fencesRoot, { xStart: -30, xEnd: -4, z: -20, y: 0.8 });
-  createFenceCurve(fencesRoot, { xStart: 8, xEnd: 34, z: 18, y: 1.1 });
+  createFenceLine(fencesRoot, { xStart: -56, xEnd: -16, z: -18.5 });
+  createFenceLine(fencesRoot, { xStart: 14, xEnd: 56, z: 19.5 });
+  createFenceCurve(fencesRoot, { xStart: -58, xEnd: -3, z: -35, y: 0.9 });
+  createFenceCurve(fencesRoot, { xStart: 6, xEnd: 60, z: 34, y: 1.0 });
 
   propsRoot.appendChild(createWaterTower(-32, 9.5, -24, 1.15));
+  propsRoot.appendChild(createWaterTower(49, 8.2, 31, 0.82));
   propsRoot.appendChild(createRoadSign(10, 1.1, 13, -15));
   propsRoot.appendChild(createRoadSign(-9, 1.1, -14, 14));
 
@@ -402,6 +428,16 @@ function buildNeighborhoodWorld(root) {
   for (const loot of lootSpecs) {
     lootRoot.appendChild(createLootProp(loot));
   }
+}
+
+function createHill(options) {
+  const hillEl = document.createElement("a-sphere");
+  hillEl.setAttribute("radius", options.radius || "18");
+  hillEl.setAttribute("position", options.x + " " + options.y + " " + options.z);
+  hillEl.setAttribute("scale", options.scale);
+  hillEl.setAttribute("color", options.color || HILL_COLOR);
+  hillEl.setAttribute("shader", "flat");
+  return hillEl;
 }
 
 function createHouse(options) {
