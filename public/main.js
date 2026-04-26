@@ -4,6 +4,8 @@ const REMOTE_HEAD_RADIUS = 0.16;
 const REMOTE_HAND_RADIUS = 0.1;
 const REMOTE_BODY_HEIGHT = 0.55;
 const REMOTE_BODY_RADIUS = 0.12;
+const PLAYER_NAME_KEY = "feeble_player_name";
+const DEFAULT_LOBBY_NAME = "Feeble Room";
 const LOCAL_META = {
   headColor: "#F2F5FF",
   bodyColor: "#7A9BFF",
@@ -15,53 +17,202 @@ const TEMP = {
   head: new THREE.Vector3(),
   leftHand: new THREE.Vector3(),
   rightHand: new THREE.Vector3(),
-  rig: new THREE.Vector3()
+  rig: new THREE.Vector3(),
+  world: new THREE.Vector3()
 };
 
 const avatarMap = new Map();
 
+AFRAME.registerComponent("menu-interactor", {
+  schema: {
+    defaultLength: { default: 4.5 }
+  },
+
+  init: function () {
+    this.onTriggerDown = this.onTriggerDown.bind(this);
+    this.hoveredEl = null;
+  },
+
+  play: function () {
+    this.el.addEventListener("triggerdown", this.onTriggerDown);
+  },
+
+  pause: function () {
+    this.el.removeEventListener("triggerdown", this.onTriggerDown);
+  },
+
+  tick: function () {
+    const raycaster = this.el.components.raycaster;
+    const intersection = raycaster?.intersections?.[0] || null;
+    const nextHovered = intersection ? findMenuButton(intersection.object.el) : null;
+
+    if (nextHovered !== this.hoveredEl) {
+      if (this.hoveredEl) {
+        this.hoveredEl.emit("menu-hover-end");
+      }
+
+      this.hoveredEl = nextHovered;
+
+      if (this.hoveredEl) {
+        this.hoveredEl.emit("menu-hover-start");
+      }
+    }
+
+    const lineLength = intersection ? intersection.distance : this.data.defaultLength;
+    this.el.setAttribute("line", "end", "0 0 " + (-lineLength));
+  },
+
+  onTriggerDown: function () {
+    const raycaster = this.el.components.raycaster;
+    const intersection = raycaster?.intersections?.[0] || null;
+
+    if (!intersection) {
+      return;
+    }
+
+    const button = findMenuButton(intersection.object.el);
+
+    if (button) {
+      button.emit("click");
+    }
+  }
+});
+
+AFRAME.registerComponent("grabbable", {
+  init: function () {
+    this.el.addEventListener("stateadded", updateGrabTint);
+    this.el.addEventListener("stateremoved", updateGrabTint);
+  }
+});
+
+AFRAME.registerComponent("hand-grabber", {
+  schema: {
+    radius: { default: 0.4 }
+  },
+
+  init: function () {
+    this.heldEl = null;
+    this.onGripDown = this.onGripDown.bind(this);
+    this.onGripUp = this.onGripUp.bind(this);
+  },
+
+  play: function () {
+    this.el.addEventListener("gripdown", this.onGripDown);
+    this.el.addEventListener("gripup", this.onGripUp);
+  },
+
+  pause: function () {
+    this.el.removeEventListener("gripdown", this.onGripDown);
+    this.el.removeEventListener("gripup", this.onGripUp);
+  },
+
+  onGripDown: function () {
+    if (this.heldEl) {
+      return;
+    }
+
+    const candidates = Array.from(this.el.sceneEl.querySelectorAll(".grabbable-object"));
+    let closestEl = null;
+    let closestDistance = this.data.radius;
+
+    this.el.sceneEl.object3D.updateMatrixWorld(true);
+    this.el.object3D.getWorldPosition(TEMP.world);
+
+    for (const candidate of candidates) {
+      if (candidate.is("held")) {
+        continue;
+      }
+
+      candidate.object3D.getWorldPosition(TEMP.rig);
+      const distance = TEMP.world.distanceTo(TEMP.rig);
+
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestEl = candidate;
+      }
+    }
+
+    if (!closestEl) {
+      return;
+    }
+
+    this.el.sceneEl.object3D.updateMatrixWorld(true);
+    this.el.object3D.attach(closestEl.object3D);
+    closestEl.addState("held");
+    this.heldEl = closestEl;
+  },
+
+  onGripUp: function () {
+    if (!this.heldEl) {
+      return;
+    }
+
+    this.el.sceneEl.object3D.updateMatrixWorld(true);
+    this.el.sceneEl.object3D.attach(this.heldEl.object3D);
+    this.heldEl.removeState("held");
+    this.heldEl = null;
+  }
+});
+
 window.addEventListener("DOMContentLoaded", function () {
   const scene = document.querySelector("a-scene");
   const note = document.getElementById("note");
-  const apiBaseInput = document.getElementById("api-base");
-  const playerNameInput = document.getElementById("player-name");
-  const lobbyNameInput = document.getElementById("lobby-name");
-  const lobbyCodeInput = document.getElementById("lobby-code");
-  const statusEl = document.getElementById("multiplayer-status");
-  const lobbyListEl = document.getElementById("public-lobbies");
   const remotePlayersRoot = document.getElementById("remote-players");
   const rigEl = document.getElementById("player-rig");
   const headEl = document.getElementById("player-camera");
   const leftHandEl = document.getElementById("left-hand");
   const rightHandEl = document.getElementById("right-hand");
+  const mainMenuEl = document.getElementById("main-menu");
+  const multiplayerMenuEl = document.getElementById("multiplayer-menu");
+  const playButtonEl = document.getElementById("play-button");
+  const createPublicButtonEl = document.getElementById("create-public-button");
+  const createPrivateButtonEl = document.getElementById("create-private-button");
+  const refreshLobbiesButtonEl = document.getElementById("refresh-lobbies-button");
+  const leaveLobbyButtonEl = document.getElementById("leave-lobby-button");
+  const menuStatusTextEl = document.getElementById("menu-status-text");
+  const menuCodeTextEl = document.getElementById("menu-code-text");
+  const publicLobbiesPanelEl = document.getElementById("public-lobbies-panel");
 
   if (
     !scene ||
     !note ||
-    !apiBaseInput ||
-    !playerNameInput ||
-    !lobbyNameInput ||
-    !lobbyCodeInput ||
-    !statusEl ||
-    !lobbyListEl ||
     !remotePlayersRoot ||
     !rigEl ||
     !headEl ||
     !leftHandEl ||
-    !rightHandEl
+    !rightHandEl ||
+    !mainMenuEl ||
+    !multiplayerMenuEl ||
+    !playButtonEl ||
+    !createPublicButtonEl ||
+    !createPrivateButtonEl ||
+    !refreshLobbiesButtonEl ||
+    !leaveLobbyButtonEl ||
+    !menuStatusTextEl ||
+    !menuCodeTextEl ||
+    !publicLobbiesPanelEl
   ) {
     return;
   }
 
-  if (!apiBaseInput.value.trim()) {
-    apiBaseInput.value = window.location.origin;
-  }
-
   const defaultNote = note.textContent.trim();
+  const playerName = getOrCreatePlayerName();
   let client = null;
+  let hasStarted = false;
+  let currentPublicLobbies = [];
+
+  registerHoverButton(playButtonEl, "#235F9F", "#3A86D1");
+  registerHoverButton(createPublicButtonEl, "#2B7A78", "#389E9B");
+  registerHoverButton(createPrivateButtonEl, "#7A4BC2", "#9562E0");
+  registerHoverButton(refreshLobbiesButtonEl, "#235F9F", "#3A86D1");
+  registerHoverButton(leaveLobbyButtonEl, "#9E3D3D", "#C45656");
 
   function setStatus(text) {
-    statusEl.textContent = text;
+    menuStatusTextEl.setAttribute("value", text);
+  }
+
+  function setCodeText(text) {
+    menuCodeTextEl.setAttribute("value", text);
   }
 
   function buildLocalState() {
@@ -80,7 +231,7 @@ window.addEventListener("DOMContentLoaded", function () {
   }
 
   function ensureClient() {
-    const apiBase = apiBaseInput.value.trim() || window.location.origin;
+    const apiBase = window.location.origin;
 
     if (client && client.apiBase === apiBase) {
       return client;
@@ -107,16 +258,25 @@ window.addEventListener("DOMContentLoaded", function () {
     return client;
   }
 
+  function showMultiplayerMenu() {
+    hasStarted = true;
+    mainMenuEl.setAttribute("visible", "false");
+    multiplayerMenuEl.setAttribute("visible", "true");
+    note.textContent = "Move with the left joystick, turn with the right joystick, jump with the right A button, use the trigger on menu buttons, and grip objects to pick them up.";
+  }
+
   function renderSnapshot(snapshot) {
     clearMissingAvatars(snapshot);
 
     if (!snapshot) {
       setStatus("Not in a lobby.");
+      setCodeText("Private code: none");
       return;
     }
 
-    const codeText = snapshot.code ? " | code: " + snapshot.code : "";
-    setStatus(snapshot.name + " | " + snapshot.playerCount + "/" + snapshot.maxPlayers + codeText);
+    const codeText = snapshot.code ? "Private code: " + snapshot.code : "Private code: none";
+    setStatus(snapshot.name + " | " + snapshot.playerCount + "/" + snapshot.maxPlayers);
+    setCodeText(codeText);
 
     const localPlayerId = snapshot.youPlayerId || null;
 
@@ -149,62 +309,76 @@ window.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  async function refreshPublicLobbies() {
-    const activeClient = ensureClient();
-    const lobbies = await activeClient.listPublicLobbies();
+  function renderPublicLobbies(lobbies) {
+    currentPublicLobbies = lobbies.slice(0, 4);
 
-    if (!lobbies.length) {
-      lobbyListEl.innerHTML = "<strong>Public lobbies:</strong> none";
+    while (publicLobbiesPanelEl.firstChild) {
+      publicLobbiesPanelEl.removeChild(publicLobbiesPanelEl.firstChild);
+    }
+
+    if (!currentPublicLobbies.length) {
+      const emptyText = document.createElement("a-text");
+      emptyText.setAttribute("value", "No public lobbies found.");
+      emptyText.setAttribute("align", "center");
+      emptyText.setAttribute("color", "#DCEEFF");
+      emptyText.setAttribute("width", "2.7");
+      emptyText.setAttribute("wrap-count", "26");
+      publicLobbiesPanelEl.appendChild(emptyText);
       return;
     }
 
-    lobbyListEl.innerHTML = "<strong>Public lobbies:</strong> " + lobbies
-      .map(function (lobby) {
-        return (
-          "<div>" +
-          escapeHtml(lobby.name) +
-          " (" + lobby.playerCount + "/" + lobby.maxPlayers + ")" +
-          "<button data-lobby-id=\"" + lobby.lobbyId + "\">Join</button>" +
-          "</div>"
-        );
-      })
-      .join("");
-
-    lobbyListEl.querySelectorAll("button[data-lobby-id]").forEach(function (button) {
-      button.addEventListener("click", async function () {
-        try {
-          const joiningClient = ensureClient();
-          await joiningClient.joinLobbyById({
-            lobbyId: button.dataset.lobbyId,
-            playerName: playerNameInput.value.trim(),
-            playerState: buildLocalState(),
-            playerMeta: LOCAL_META
-          });
-        } catch (error) {
-          setStatus(error.message);
-        }
+    currentPublicLobbies.forEach(function (lobby, index) {
+      const y = -index * 0.28;
+      const button = createMenuButton({
+        id: "join-lobby-" + index,
+        color: "#3D5A80",
+        label: "Join " + trimLabel(lobby.name, 12) + " (" + lobby.playerCount + "/" + lobby.maxPlayers + ")",
+        position: "0 " + y + " 0.02",
+        width: 1.95,
+        height: 0.2,
+        textWidth: 2.7
       });
+
+      registerHoverButton(button, "#3D5A80", "#5072A0");
+      button.addEventListener("click", function () {
+        joinPublicLobby(lobby.lobbyId).catch(function (error) {
+          setStatus(error.message);
+        });
+      });
+      publicLobbiesPanelEl.appendChild(button);
     });
+  }
+
+  async function refreshPublicLobbies() {
+    const activeClient = ensureClient();
+    const lobbies = await activeClient.listPublicLobbies();
+    renderPublicLobbies(lobbies);
   }
 
   async function createLobby(privateLobby) {
     const activeClient = ensureClient();
+    const code = privateLobby ? generatePrivateCode() : "";
+
     await activeClient.createLobby({
-      playerName: playerNameInput.value.trim(),
-      lobbyName: lobbyNameInput.value.trim(),
+      playerName: playerName,
+      lobbyName: DEFAULT_LOBBY_NAME,
       privateLobby: privateLobby,
-      code: lobbyCodeInput.value.trim(),
+      code: code,
       maxPlayers: 12,
       playerState: buildLocalState(),
       playerMeta: LOCAL_META
     });
+
+    if (privateLobby) {
+      setCodeText("Private code: " + code);
+    }
   }
 
-  async function joinByCode() {
+  async function joinPublicLobby(lobbyId) {
     const activeClient = ensureClient();
-    await activeClient.joinLobbyByCode({
-      code: lobbyCodeInput.value.trim(),
-      playerName: playerNameInput.value.trim(),
+    await activeClient.joinLobbyById({
+      lobbyId: lobbyId,
+      playerName: playerName,
       playerState: buildLocalState(),
       playerMeta: LOCAL_META
     });
@@ -218,31 +392,32 @@ window.addEventListener("DOMContentLoaded", function () {
     requestAnimationFrame(stateLoop);
   }
 
-  document.getElementById("create-public").addEventListener("click", function () {
-    createLobby(false).catch(function (error) {
-      setStatus(error.message);
-    });
-  });
-
-  document.getElementById("create-private").addEventListener("click", function () {
-    createLobby(true).catch(function (error) {
-      setStatus(error.message);
-    });
-  });
-
-  document.getElementById("join-code").addEventListener("click", function () {
-    joinByCode().catch(function (error) {
-      setStatus(error.message);
-    });
-  });
-
-  document.getElementById("refresh-lobbies").addEventListener("click", function () {
+  playButtonEl.addEventListener("click", function () {
+    showMultiplayerMenu();
     refreshPublicLobbies().catch(function (error) {
       setStatus(error.message);
     });
   });
 
-  document.getElementById("leave-lobby").addEventListener("click", function () {
+  createPublicButtonEl.addEventListener("click", function () {
+    createLobby(false).catch(function (error) {
+      setStatus(error.message);
+    });
+  });
+
+  createPrivateButtonEl.addEventListener("click", function () {
+    createLobby(true).catch(function (error) {
+      setStatus(error.message);
+    });
+  });
+
+  refreshLobbiesButtonEl.addEventListener("click", function () {
+    refreshPublicLobbies().catch(function (error) {
+      setStatus(error.message);
+    });
+  });
+
+  leaveLobbyButtonEl.addEventListener("click", function () {
     if (!client) {
       return;
     }
@@ -251,6 +426,7 @@ window.addEventListener("DOMContentLoaded", function () {
       .then(function () {
         clearMissingAvatars(null);
         renderSnapshot(null);
+        refreshPublicLobbies().catch(function () {});
       })
       .catch(function (error) {
         setStatus(error.message);
@@ -258,29 +434,85 @@ window.addEventListener("DOMContentLoaded", function () {
   });
 
   scene.addEventListener("enter-vr", function () {
-    note.textContent = "Press Enter VR, use the left joystick to move, and press the right A button to jump. Multiplayer avatars sync through the Cloudflare Worker URL in the panel.";
+    if (!hasStarted) {
+      note.textContent = "Aim at the Play button with either controller and pull the trigger. After that, use the right-side VR menu for multiplayer.";
+      return;
+    }
+
+    note.textContent = "Move with the left joystick, turn with the right joystick, jump with the right A button, use the trigger on menu buttons, and grip objects to pick them up.";
   });
 
   scene.addEventListener("exit-vr", function () {
     note.textContent = defaultNote;
   });
 
-  ensureWorkerPlaceholder(apiBaseInput);
+  const startupClient = ensureClient();
+  startupClient.restore().then(function (snapshot) {
+    if (snapshot) {
+      renderSnapshot(snapshot);
+    }
+  }).catch(function () {});
 
-  if (apiBaseInput.value.trim()) {
-    const startupClient = ensureClient();
-
-    startupClient.restore().then(function (snapshot) {
-      if (snapshot) {
-        setStatus("Restored " + snapshot.name + ".");
-      }
-    }).catch(function () {});
-
-    refreshPublicLobbies().catch(function () {});
-  }
-
+  renderPublicLobbies([]);
   stateLoop();
 });
+
+function createMenuButton(options) {
+  const button = document.createElement("a-plane");
+  const text = document.createElement("a-text");
+
+  button.setAttribute("id", options.id);
+  button.setAttribute("class", "menu-hitbox");
+  button.setAttribute("position", options.position);
+  button.setAttribute("width", options.width);
+  button.setAttribute("height", options.height);
+  button.setAttribute("color", options.color);
+
+  text.setAttribute("value", options.label);
+  text.setAttribute("position", "0 0 0.01");
+  text.setAttribute("align", "center");
+  text.setAttribute("color", "#FFFFFF");
+  text.setAttribute("width", options.textWidth || 2.2);
+  text.setAttribute("wrap-count", "24");
+
+  button.appendChild(text);
+  return button;
+}
+
+function registerHoverButton(buttonEl, baseColor, hoverColor) {
+  buttonEl.setAttribute("color", baseColor);
+  buttonEl.addEventListener("menu-hover-start", function () {
+    buttonEl.setAttribute("color", hoverColor);
+  });
+  buttonEl.addEventListener("menu-hover-end", function () {
+    buttonEl.setAttribute("color", baseColor);
+  });
+}
+
+function findMenuButton(startEl) {
+  let el = startEl;
+
+  while (el) {
+    if (el.classList && el.classList.contains("menu-hitbox")) {
+      return el;
+    }
+
+    el = el.parentEl;
+  }
+
+  return null;
+}
+
+function updateGrabTint(event) {
+  const el = event.target;
+
+  if (el.is("held")) {
+    el.setAttribute("opacity", "0.8");
+    return;
+  }
+
+  el.setAttribute("opacity", "1");
+}
 
 function getOrCreateAvatar(playerId, root) {
   const existing = avatarMap.get(playerId);
@@ -347,6 +579,7 @@ function updateAvatar(avatar, player) {
     y: head.y + 0.28,
     z: head.z
   }));
+
   if (meta.headColor) {
     avatar.head.setAttribute("color", meta.headColor);
   }
@@ -388,15 +621,26 @@ function round(value) {
   return Number(value.toFixed(3));
 }
 
-function ensureWorkerPlaceholder(apiBaseInput) {
-  apiBaseInput.placeholder = "https://your-worker.workers.dev";
+function getOrCreatePlayerName() {
+  const stored = sessionStorage.getItem(PLAYER_NAME_KEY);
+
+  if (stored) {
+    return stored;
+  }
+
+  const generated = "Quest Player " + Math.floor(100 + Math.random() * 900);
+  sessionStorage.setItem(PLAYER_NAME_KEY, generated);
+  return generated;
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;")
-    .replaceAll("'", "&#39;");
+function generatePrivateCode() {
+  return Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+
+function trimLabel(text, maxLength) {
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return text.slice(0, maxLength - 3) + "...";
 }
