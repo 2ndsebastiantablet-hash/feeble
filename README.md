@@ -1,10 +1,12 @@
-# Quest Gorilla Locomotion Prototype
+# FEEBLE
 
-This is a WebXR locomotion prototype for Meta Quest Browser using A-Frame and plain JavaScript.
+This is a WebXR Quest game prototype for Meta Quest Browser using A-Frame and plain JavaScript.
 
 It now includes:
 
-- Gorilla Tag-style hand locomotion
+- a VR-first `FEEBLE` main menu with a Play button
+- left joystick movement, right joystick turning, and right-button jump
+- grabbable objects that can be picked up with either controller grip button
 - a Cloudflare Worker multiplayer backend adapted from the `fly-game` multiplayer template
 - a browser multiplayer client that syncs VR rig, head, and hand positions
 - simple remote player avatars rendered directly in the A-Frame scene
@@ -92,9 +94,13 @@ Deploy steps:
 2. Open the Worker root URL in Meta Quest Browser.
 3. Press `Enter VR`.
 4. Confirm you can:
-   - move with hand locomotion
+   - use the VR main menu
+   - move with the left joystick
+   - turn with the right joystick
+   - jump with the right controller button
+   - pick up scene objects with either grip button
    - see remote player avatars update live
-   - create public lobbies, private lobbies, and join by code
+   - create public lobbies, create private lobbies, and join public lobby listings from the VR multiplayer menu
 
 The multiplayer input now defaults to the current site origin, so when you open the deployed Worker URL it already points at the correct backend.
 
@@ -141,6 +147,6 @@ Example:
 
 ## Important notes
 
-- Thumbstick locomotion and teleport are still disabled.
+- Teleport is still disabled.
 - This is still a prototype. The multiplayer sync is pose/state sync, not a full authoritative physics simulation.
 - The server-authoritative hooks live in `backend/server-authority.js`.
