@@ -34,7 +34,8 @@
 </head>
 <body>
   <div id="note">
-    Open this page in Meta Quest Browser and press Enter VR.
+    Open this page in Meta Quest Browser, press Enter VR, use the left joystick to move, and press
+    the right A button to jump.
   </div>
 
   <a-scene
@@ -47,9 +48,21 @@
 
     <a-sky color="#CFE8FF"></a-sky>
 
-    <!-- Simple player rig with a camera at normal standing height. -->
-    <a-entity id="player-rig" position="0 0 4">
+    <!-- Simple player rig with left-stick movement and a right-controller jump button. -->
+    <a-entity id="player-rig" position="0 0 4" simple-vr-locomotion="leftController: #left-controller; rightController: #right-controller; camera: #player-camera">
       <a-camera id="player-camera" position="0 1.6 0" wasd-controls-enabled="false"></a-camera>
+
+      <a-entity
+        id="left-controller"
+        position="-0.25 1.2 -0.5"
+        oculus-touch-controls="hand: left"
+      ></a-entity>
+
+      <a-entity
+        id="right-controller"
+        position="0.25 1.2 -0.5"
+        oculus-touch-controls="hand: right"
+      ></a-entity>
     </a-entity>
 
     <a-plane
