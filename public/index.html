@@ -62,8 +62,6 @@
         id="left-hand"
         position="-0.25 1.2 -0.5"
         oculus-touch-controls="hand: left"
-        cursor="rayOrigin: entity; fuse: false; downEvents: triggerdown"
-        raycaster="objects: .menu-hitbox; far: 8"
         line="color: #FF7AA2; opacity: 0.85"
         menu-interactor="defaultLength: 4.5"
         hand-grabber
@@ -75,8 +73,6 @@
         id="right-hand"
         position="0.25 1.2 -0.5"
         oculus-touch-controls="hand: right"
-        cursor="rayOrigin: entity; fuse: false; downEvents: triggerdown"
-        raycaster="objects: .menu-hitbox; far: 8"
         line="color: #6FC3FF; opacity: 0.85"
         menu-interactor="defaultLength: 4.5"
         hand-grabber
@@ -110,7 +106,7 @@
         ></a-text>
         <a-plane
           id="play-button"
-          class="menu-hitbox"
+          class="menu-hitbox vr-button"
           position="0 -0.58 0.03"
           width="1.2"
           height="0.34"
@@ -154,16 +150,16 @@
           wrap-count="28"
         ></a-text>
 
-        <a-plane id="create-public-button" class="menu-hitbox" position="-0.6 -0.02 0.03" width="0.95" height="0.24" color="#2B7A78">
+        <a-plane id="create-public-button" class="menu-hitbox vr-button" position="-0.6 -0.02 0.03" width="0.95" height="0.24" color="#2B7A78">
           <a-text value="Create Public" position="0 0 0.01" align="center" color="#FFFFFF" width="2.2"></a-text>
         </a-plane>
-        <a-plane id="create-private-button" class="menu-hitbox" position="0.6 -0.02 0.03" width="0.95" height="0.24" color="#7A4BC2">
+        <a-plane id="create-private-button" class="menu-hitbox vr-button" position="0.6 -0.02 0.03" width="0.95" height="0.24" color="#7A4BC2">
           <a-text value="Create Private" position="0 0 0.01" align="center" color="#FFFFFF" width="2.2"></a-text>
         </a-plane>
-        <a-plane id="refresh-lobbies-button" class="menu-hitbox" position="-0.6 -0.34 0.03" width="0.95" height="0.24" color="#235F9F">
+        <a-plane id="refresh-lobbies-button" class="menu-hitbox vr-button" position="-0.6 -0.34 0.03" width="0.95" height="0.24" color="#235F9F">
           <a-text value="Refresh List" position="0 0 0.01" align="center" color="#FFFFFF" width="2.2"></a-text>
         </a-plane>
-        <a-plane id="leave-lobby-button" class="menu-hitbox" position="0.6 -0.34 0.03" width="0.95" height="0.24" color="#9E3D3D">
+        <a-plane id="leave-lobby-button" class="menu-hitbox vr-button" position="0.6 -0.34 0.03" width="0.95" height="0.24" color="#9E3D3D">
           <a-text value="Leave Lobby" position="0 0 0.01" align="center" color="#FFFFFF" width="2.2"></a-text>
         </a-plane>
 
@@ -175,6 +171,15 @@
           width="2.8"
         ></a-text>
         <a-entity id="public-lobbies-panel" position="0 -0.98 0.03"></a-entity>
+        <a-text
+          id="menu-debug-text"
+          value="Ray hit: false"
+          position="0 -1.44 0.02"
+          align="center"
+          color="#CDE5FF"
+          width="2.7"
+          wrap-count="34"
+        ></a-text>
       </a-entity>
     </a-entity>
 
