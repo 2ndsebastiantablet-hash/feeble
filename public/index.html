@@ -31,6 +31,7 @@
       max-width: 360px;
       line-height: 1.45;
     }
+
   </style>
 </head>
 <body>
@@ -61,6 +62,7 @@
         id="left-hand"
         position="-0.25 1.2 -0.5"
         oculus-touch-controls="hand: left"
+        cursor="rayOrigin: entity; fuse: false; downEvents: triggerdown"
         raycaster="objects: .menu-hitbox; far: 8"
         line="color: #FF7AA2; opacity: 0.85"
         menu-interactor="defaultLength: 4.5"
@@ -73,6 +75,7 @@
         id="right-hand"
         position="0.25 1.2 -0.5"
         oculus-touch-controls="hand: right"
+        cursor="rayOrigin: entity; fuse: false; downEvents: triggerdown"
         raycaster="objects: .menu-hitbox; far: 8"
         line="color: #6FC3FF; opacity: 0.85"
         menu-interactor="defaultLength: 4.5"
